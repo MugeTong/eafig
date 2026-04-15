@@ -1,23 +1,25 @@
-from eafig import load_config, register_config, save_config
+from eafig import Eafig, register_root, register_config
 
-
-@register_config
+@register_root
 class MyConfig:
     a: int
-    b: str
     c: float = 1.0
 
+@register_config(name="sub_config", frozen=True)
+class MySubConfig:
+    x: float = 1.0
+    y: str = "sub_default"
 
-def main():
-    # Load config from a file
-    load_config()
+# Load config from a file or command line arguments
+# The function call order decides the parmeter loading priority,
+# with later calls having higher priority.
+Eafig.load("config/default.yaml")
+Eafig.from_cli()
 
-    # Create a config instance using the loaded config
-    config_instance = MyConfig(1, "asd")
-    print("Config instance:", config_instance)
+# Create a config instance using the loaded config
+config_instance = MyConfig(a=5)
+sub_config_instance = MySubConfig()
+print("full config:", Eafig._get_full_config())
 
-    # Save the current config to a file
-    save_config()
-
-if __name__ == "__main__":
-    main()
+# Save the current config to a file
+Eafig.save("config/saved_config.yaml")

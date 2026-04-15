@@ -1,0 +1,30 @@
+name: Publish release to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  push-to-pypi:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+
+    - name: Install build dependencies
+      run: pip install hatch
+
+    - name: Build binary wheel and source tarball
+      run: hatch build
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
