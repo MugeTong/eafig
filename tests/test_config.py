@@ -5,6 +5,7 @@ from dataclasses import field
 from typing import List
 from eafig import Eafig, register_root, register_config
 from eafig.state import ConfigState
+from omegaconf import DictConfig
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +46,7 @@ def test_sub_config_loading():
         val: str = "old"
 
     # 模拟加载了子配置
-    ConfigState._loaded_configs = {"sub": {"val": "new"}}
+    ConfigState._loaded_configs = DictConfig({"sub": {"val": "new"}})
 
     sub = SubConfig()
     assert sub.val == "new"
@@ -63,7 +64,7 @@ def test_priority_logic():
 
     # 情况 B: 加载值覆盖默认值
     ConfigState._reset()  # 重置状态以允许重新注册 root
-    ConfigState._loaded_configs = {"p": 2}
+    ConfigState._loaded_configs = DictConfig({"p": 2})
     assert PriorityConfig().p == 2
 
     # 情况 C: 手动传入覆盖加载值
@@ -80,7 +81,7 @@ def test_list_support(tmp_path):
         tags: List[str] = field(default_factory=list)
 
     # 即使加载的是 tuple 或其他序列，也应尝试转换（或保持）
-    ConfigState._loaded_configs = {"tags": ["a", "b"]}
+    ConfigState._loaded_configs = DictConfig({"tags": ["a", "b"]})
     config = ListConfig()
     assert config.tags == ["a", "b"]
 
