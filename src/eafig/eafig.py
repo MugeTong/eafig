@@ -1,77 +1,47 @@
-from dataclasses import asdict
-import os
+from pathlib import Path
 import sys as _sys
+from typing import IO, Any
+from omegaconf import OmegaConf
 
-from omegaconf import DictConfig, OmegaConf
-from typing import Any, Dict, List, Optional
-
-from .state import ConfigState
+from . import state
 
 
-class Eafig:
-    @staticmethod
-    def from_cli(args_list: Optional[List[str]] = None) -> None:
-        """Load configuration from command line arguments."""
-        if args_list is None:
-            args_list = _sys.argv[1:]
-        return Eafig._from_dotlist(args_list)
+def from_cli(args_list: list[str] | None = None) -> dict:
+    """Parse command line arguments and return the root configuration as a dictionary.
 
-    @staticmethod
-    def _from_dotlist(dotlist: List[str]) -> None:
-        """Load configuration from a list of dotlist strings.
+    Args:
+        args_list: A list of command line arguments. If None, it defaults to sys.argv[1:].
 
-        Args:
-            dotlist: A list of dotlist-style strings, e.g. ["--model.lr 0.001", "--data.batch_size 32"].
+    Returns:
+        A dictionary representing the root configuration.
+    """
 
-        """
-        assert dotlist[0].startswith(
-            "--"
-        ), "Command line arguments must start with '--'."
+    if args_list is None:
+        args_list = _sys.argv[1:]
 
-        processed_dotlist = []
-        i = 0
+    state.parse_cli(args_list)
 
-        while i < len(dotlist):
-            arg = dotlist[i]
+    return state.get_root_config()
 
-            if not arg.startswith("-"):
-                raise ValueError(
-                    f"Invalid command line argument '{arg}'. Arguments must start with '--'."
-                )
 
-            key = arg.lstrip("-")
+def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict:
+    """Load configuration from a file and return the root configuration as a dictionary.
 
-            if i + 1 < len(dotlist) and not dotlist[i + 1].startswith("-"):
-                value = dotlist[i + 1]
-                processed_dotlist.append(f"{key}={value}")
-                i += 2
-            else:
-                processed_dotlist.append(f"{key}=True")
-                i += 1
+    Args:
+        file_path: The path to the configuration file.
+        keep_cli: If True, command line arguments will take precedence over the loaded configuration. Default is False.
+    Returns:
+        A dictionary representing the root configuration.
+    """
+    state.parse_file(file_path, keep_cli)
 
-        if processed_dotlist:
-            config = OmegaConf.from_dotlist(processed_dotlist)
-            ConfigState.merge_config(config)
+    return state.get_root_config()
 
-    @staticmethod
-    def load(file_path: str | None = None) -> None:
-        if file_path is None:
-            return
 
-        loaded_config = OmegaConf.load(file_path)
-        if not isinstance(loaded_config, DictConfig):
-            raise ValueError(f"Loaded config from '{file_path}' is not a dictionary")
+def save(file_path: str | Path | IO[Any]) -> None:
+    """Save the current full configuration to a file.
 
-        ConfigState.merge_config(loaded_config)
-
-    @staticmethod
-    def save(file_path: str):
-        config_to_save = Eafig._get_full_config()
-
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w") as f:
-            OmegaConf.save(config_to_save, f)
-
-    @staticmethod
-    def _get_full_config() -> Dict[str, Any]:
-        return ConfigState.get_full_configs()
+    Args:
+        file_path: The path to the file where the configuration will be saved.
+    """
+    OmegaConf.save(state.get_full_config(), file_path)

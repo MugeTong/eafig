@@ -1,4 +1,4 @@
-from .eafig import Eafig
-from .registry import register_config, register_root
+from .eafig import from_cli, load, save
+from .registry import configclass, rootconfig
 
-__all__ = ["register_config", "register_root", "Eafig"]
+__all__ = ["from_cli", "load", "save", "configclass", "rootconfig"]

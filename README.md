@@ -1,6 +1,6 @@
 # Eafig
 
-Manage your hyperparameters more easily.
+Manage your hyperparameters from the outside.
 
 ## Installation
 
