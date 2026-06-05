@@ -1,17 +1,19 @@
 from typing import Any, IO, cast
 from pathlib import Path
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields as dc_fields
 from omegaconf import DictConfig, OmegaConf
 
 
 @dataclass
 class RegisteredConfig:
     hidden: bool = False
+    strict: bool = True
 
 
 # Global state variables
 _stored_config: DictConfig = OmegaConf.create({})
 _registered: dict[str, RegisteredConfig] = {}
+_root_strict: bool = True
 
 
 def _validate_registered_paths_are_dict(config: DictConfig, source: str) -> None:
@@ -101,8 +103,53 @@ def get_root_config() -> dict:
     excluded_keys = {name.split(".", 1)[0] for name in _registered}
     return {k: v for k, v in config.items() if k not in excluded_keys}
 
+def _get_known_keys(path: str, instance: Any) -> set[str]:
+    """Get all known keys at a given config path: fields from the dataclass instance
+    plus top-level prefixes of registered child configs under this path."""
+    known: set[str] = {f.name for f in dc_fields(instance)}
+
+    prefix = path + "." if path else ""
+    for reg_path in _registered:
+        if reg_path.startswith(prefix):
+            remainder = reg_path[len(prefix):]
+            known.add(remainder.split(".")[0])
+
+    return known
+
+
+def _validate_unknown_keys(path: str, instance: Any) -> None:
+    """Validate that _stored_config contains no unknown keys at the given path.
+
+    Raises:
+        KeyError: If unknown keys are found at the given path.
+    """
+    known = _get_known_keys(path, instance)
+
+    # Navigate to the config node at this path
+    node = _stored_config
+    if path:
+        for part in path.split("."):
+            if part not in node:
+                return  # Path doesn't exist yet, nothing to validate
+            node = node[part]
+
+    if not hasattr(node, "keys"):
+        return
+
+    unknown = {str(k) for k in node.keys()} - known
+    if unknown:
+        location = f"'{path}'" if path else "root"
+        raise KeyError(
+            f"Unknown configuration key(s) in {location} config: {sorted(unknown)}. "
+            f"Known keys: {sorted(known)}."
+        )
+
+
 def set_root_config(instance: Any) -> None:
     global _stored_config
+
+    if _root_strict:
+        _validate_unknown_keys("", instance)
 
     instance_dict = asdict(instance)
     _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, instance_dict))
@@ -120,6 +167,10 @@ def get_child_config(path: str) -> dict:
 
 def set_child_config(path: str, instance: Any, hidden: bool = False) -> None:
     global _stored_config
+
+    registered = _registered.get(path)
+    if registered is not None and registered.strict:
+        _validate_unknown_keys(path, instance)
 
     parts = path.split(".")
     new_config = {}
@@ -158,12 +209,24 @@ def get_stored_config() -> dict:
     """Get the stored configuration (the merged result of file and CLI) as a dictionary."""
     return cast(dict, OmegaConf.to_container(_stored_config, resolve=True))
 
-def register_config(path: str, hidden: bool = False) -> None:
+
+def set_root_strict(strict: bool) -> None:
+    """Set the strict mode for the root configuration.
+
+    Args:
+        strict: If True, unknown keys in the root configuration will raise an error.
+    """
+    global _root_strict
+    _root_strict = strict
+
+
+def register_config(path: str, hidden: bool = False, strict: bool = True) -> None:
     """Register a configuration path.
 
     Args:
         hidden: If True, the configuration will be hidden when exported. Default is False.
+        strict: If True, unknown keys at this path will raise an error. Default is True.
     """
     if path in _registered:
         raise ValueError(f"Configuration path '{path}' is already registered.")
-    _registered[path] = RegisteredConfig(hidden=hidden)
+    _registered[path] = RegisteredConfig(hidden=hidden, strict=strict)

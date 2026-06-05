@@ -8,10 +8,10 @@ class MyConfig:
     c: float = 1.0
 
 
-@configclass(name="sub_config", frozen=True)
+@configclass(name="sub_config", frozen=False)
 class MySubConfig:
-    x: float = 1.0
-    y: str = "sub_default"
+    x: str = "sub_default"
+    ys: str = "sub_default"
 
 
 # Load config from a file or command line arguments
