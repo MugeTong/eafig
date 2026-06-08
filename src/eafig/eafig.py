@@ -38,10 +38,16 @@ def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict:
     return state.get_root_config()
 
 
-def save(file_path: str | Path | IO[Any]) -> None:
+def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:
     """Save the current full configuration to a file.
 
     Args:
         file_path: The path to the file where the configuration will be saved.
+        sort_keys: If True, keys will be sorted alphabetically. Default is True.
     """
-    OmegaConf.save(state.get_full_config(), file_path)
+    config = state.get_full_config()
+    if isinstance(file_path, (str, Path)):
+        with open(file_path, "w") as f:
+            f.write(OmegaConf.to_yaml(config, sort_keys=sort_keys))
+    else:
+        file_path.write(OmegaConf.to_yaml(config, sort_keys=sort_keys))
