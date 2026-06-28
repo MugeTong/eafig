@@ -18,3 +18,8 @@ runs/
 logs/
 wandb/
 checkpoints/
+
+# Generated config outputs
+config/*_output.yaml
+config/run*.yaml
+config/saved_config.yaml
