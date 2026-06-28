@@ -1,48 +1,39 @@
 from typing import Any, IO, cast
 from pathlib import Path
-from dataclasses import asdict, dataclass, fields as dc_fields
 from omegaconf import DictConfig, OmegaConf
+from . import schema
+from .schema import _schema_root, ConfigSchema
 
-
-@dataclass
-class RegisteredConfig:
-    hidden: bool = False
-    strict: bool = True
-
-
-# Global state variables
 _stored_config: DictConfig = OmegaConf.create({})
-_registered: dict[str, RegisteredConfig] = {}
-_root_strict: bool = True
 
 
-def _validate_registered_paths_are_dict(config: DictConfig, source: str) -> None:
-    """Ensure every registered path present in config resolves to a dictionary node."""
-    config_dict = cast(dict, OmegaConf.to_container(config, resolve=True))
+def _validate(config: DictConfig, source: str) -> None:
+    """Validate the configuration against the schema."""
 
-    for path in _registered:
-        parts = path.split(".")
-        node: Any = config_dict
+    if _schema_root.strict and (_schema_root.fields or _schema_root.children):
+        for key in config:
+            if key not in _schema_root.valid_keys:
+                raise KeyError(f"Unknown key '{key}' in {source}.")
 
-        for idx, part in enumerate(parts):
-            prefix = ".".join(parts[:idx])
-            if not isinstance(node, dict):
-                raise TypeError(
-                    f"Registered path '{path}' must resolve to a dict, "
-                    f"but '{prefix}' in {source} is {type(node).__name__}."
-                )
+    for path, schema_node in schema.iter_schema():
+        if OmegaConf.is_missing(config, path):
+            continue
+        value = OmegaConf.select(config, path)
+        if value is None:
+            continue
 
-            if part not in node:
-                break
+        # The node registered in the schema must be a DictConfig
+        if not isinstance(value, DictConfig):
+            raise TypeError(
+                f"Path '{path}' is registered as a config group, "
+                f"but got {type(value).__name__} in {source}."
+            )
 
-            node = node[part]
-        else:
-            if not isinstance(node, dict):
-                raise TypeError(
-                    f"Registered path '{path}' must resolve to a dict, "
-                    f"but '{path}' in {source} is {type(node).__name__}."
-                )
-
+        # If the schema is strict, check for unknown keys
+        if schema_node.strict:
+            for key in value:
+                if key not in schema_node.valid_keys:
+                    raise KeyError(f"Unknown key '{path}.{key}' in {source}.")
 
 def parse_cli(args_list: list[str]) -> None:
     """Parse command line arguments and store them in the state."""
@@ -71,11 +62,9 @@ def parse_cli(args_list: list[str]) -> None:
         else:
             idx += 1
     cli_config = OmegaConf.from_dotlist(dotlist)
-    _validate_registered_paths_are_dict(cli_config, "CLI configuration")
-    # _validate_registered_paths_are_dict(_stored_config, "stored configuration")
+    _validate(cli_config, "command line arguments")
 
     _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, cli_config))
-
 
 def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
     """Parse a configuration file and store it in the state.
@@ -86,147 +75,94 @@ def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
     """
     global _stored_config
 
-    file_config = cast(DictConfig, OmegaConf.load(file_path))
-    _validate_registered_paths_are_dict(file_config, "file configuration")
-    # _validate_registered_paths_are_dict(_stored_config, "stored configuration")
+    raw = OmegaConf.load(file_path)
+    if not isinstance(raw, DictConfig):
+        raise TypeError(
+            f"Config file '{file_path}' must be a YAML mapping (dict), "
+            f"but got {type(raw).__name__}."
+        )
+    _validate(raw, f"configuration file '{file_path}'")
 
     if keep_cli:
-        _stored_config = cast(DictConfig, OmegaConf.merge(file_config, _stored_config))
+        _stored_config = cast(DictConfig, OmegaConf.merge(raw, _stored_config))
     else:
-        _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, file_config))
+        _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, raw))
 
 
-def get_root_config() -> dict:
-    """Get the root configuration as a dictionary."""
-    config = cast(dict, OmegaConf.to_container(_stored_config, resolve=True))
-    # Exclude registered configuration namespaces from root export.
-    excluded_keys = {name.split(".", 1)[0] for name in _registered}
-    return {k: v for k, v in config.items() if k not in excluded_keys}
+def _get_config(path: str | None = None, recursive: bool = False, apply_hidden: bool = False) -> dict:
+    """Get the configuration at the specified path.
 
-def _get_known_keys(path: str, instance: Any) -> set[str]:
-    """Get all known keys at a given config path: fields from the dataclass instance
-    plus top-level prefixes of registered child configs under this path."""
-    known: set[str] = {f.name for f in dc_fields(instance)}
-
-    prefix = path + "." if path else ""
-    for reg_path in _registered:
-        if reg_path.startswith(prefix):
-            remainder = reg_path[len(prefix):]
-            known.add(remainder.split(".")[0])
-
-    return known
-
-
-def _validate_unknown_keys(path: str, instance: Any) -> None:
-    """Validate that _stored_config contains no unknown keys at the given path.
-
-    Raises:
-        KeyError: If unknown keys are found at the given path.
+    Args:
+        path (str | None): The dot-separated path to the configuration. Default is None (root).
+        recursive (bool): If True, retrieves the configuration recursively. Default is False.
+        apply_hidden (bool): If True, includes hidden configurations. Default is False.
     """
-    known = _get_known_keys(path, instance)
+    # Locate the schema node corresponding to the given path
+    schema_node = _schema_root
+    if path is not None:
+        for key in path.split("."):
+            if key not in schema_node.children:
+                raise KeyError(f"Path '{path}' is not registered in schema.")
+            schema_node = schema_node.children[key]
 
-    # Navigate to the config node at this path
-    node = _stored_config
-    if path:
-        for part in path.split("."):
-            if part not in node:
-                return  # Path doesn't exist yet, nothing to validate
-            node = node[part]
-
-    if not hasattr(node, "keys"):
-        return
-
-    unknown = {str(k) for k in node.keys()} - known
-    if unknown:
-        location = f"'{path}'" if path else "root"
-        raise KeyError(
-            f"Unknown configuration key(s) in {location} config: {sorted(unknown)}. "
-            f"Known keys: {sorted(known)}."
-        )
-
-
-def set_root_config(instance: Any) -> None:
-    global _stored_config
-
-    if _root_strict:
-        _validate_unknown_keys("", instance)
-
-    instance_dict = asdict(instance)
-    _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, instance_dict))
-
-def get_child_config(path: str) -> dict:
-    """Get a registered child configuration by its path."""
-    parts = path.split(".")
-    node: Any = _stored_config
-    for part in parts:
-        if part not in node:
+        if OmegaConf.is_missing(_stored_config, path):
             return {}
-        node = node[part]
-    return cast(dict, OmegaConf.to_container(node, resolve=True))
+        config_node = OmegaConf.select(_stored_config, path)
+        if config_node is None:
+            return {}
+    else:
+        config_node = _stored_config
+
+    return _extract(config_node, schema_node, recursive=recursive, apply_hidden=apply_hidden)
 
 
-def set_child_config(path: str, instance: Any, hidden: bool = False) -> None:
+def _extract(
+    config_node: DictConfig,
+    schema_node: ConfigSchema,
+    recursive: bool,
+    apply_hidden: bool,
+) -> dict:
+    result = {}
+    for field in schema_node.fields:
+        if field in config_node:
+            value = config_node[field]
+            result[field] = (
+                OmegaConf.to_container(value, resolve=True)
+                if OmegaConf.is_config(value)
+                else value
+            )
+
+    for key, child_schema in schema_node.children.items():
+        if not apply_hidden and child_schema.hidden:
+            continue
+        if key not in config_node:
+            continue
+
+        value = config_node[key]
+
+        if child_schema.children:
+            result[key] = _extract(value, child_schema, recursive=recursive, apply_hidden=apply_hidden)
+        elif OmegaConf.is_config(value):
+            result[key] = OmegaConf.to_container(value, resolve=True)
+        else:
+            result[key] = value
+
+    # For non-strict nodes, preserve unknown keys from the config
+    if not schema_node.strict:
+        known = schema_node.fields | schema_node.children.keys()
+        for key in config_node:
+            if key not in known:
+                value = config_node[key]
+                if OmegaConf.is_config(value):
+                    result[key] = OmegaConf.to_container(value, resolve=True)
+                else:
+                    result[key] = value
+
+    return result
+
+def _set_config(path: str | None, config: dict) -> None:
     global _stored_config
-
-    registered = _registered.get(path)
-    if registered is not None and registered.strict:
-        _validate_unknown_keys(path, instance)
-
-    parts = path.split(".")
-    new_config = {}
-    current = new_config
-    for part in parts[:-1]:
-        current[part] = {}
-        current = current[part]
-    current[parts[-1]] = asdict(instance)
-
-    _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, new_config))
-
-
-def get_full_config() -> dict:
-    """Get the full configuration, including all registered child configurations, as a dictionary."""
-    config = cast(dict, OmegaConf.to_container(_stored_config, resolve=True))
-
-    def _filter_registered_keys(node: Any, parent: str = "") -> Any:
-        if not isinstance(node, dict):
-            return node
-
-        result: dict[str, Any] = {}
-        for key, value in node.items():
-            full_key = f"{parent}.{key}" if parent else key
-            registered = _registered.get(full_key)
-
-            if registered is not None and registered.hidden:
-                continue
-
-            result[key] = _filter_registered_keys(value, full_key)
-        return result
-
-    return _filter_registered_keys(config)
-
-
-def get_stored_config() -> dict:
-    """Get the stored configuration (the merged result of file and CLI) as a dictionary."""
-    return cast(dict, OmegaConf.to_container(_stored_config, resolve=True))
-
-
-def set_root_strict(strict: bool) -> None:
-    """Set the strict mode for the root configuration.
-
-    Args:
-        strict: If True, unknown keys in the root configuration will raise an error.
-    """
-    global _root_strict
-    _root_strict = strict
-
-
-def register_config(path: str, hidden: bool = False, strict: bool = True) -> None:
-    """Register a configuration path.
-
-    Args:
-        hidden: If True, the configuration will be hidden when exported. Default is False.
-        strict: If True, unknown keys at this path will raise an error. Default is True.
-    """
-    if path in _registered:
-        raise ValueError(f"Configuration path '{path}' is already registered.")
-    _registered[path] = RegisteredConfig(hidden=hidden, strict=strict)
+    if path is None:
+        _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, OmegaConf.create(config)))
+    else:
+        OmegaConf.update(_stored_config, path, config, merge=True)

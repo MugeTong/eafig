@@ -29,49 +29,38 @@ class MySubConfig:
     y: str = "world"
 
 
-# Load from file, then CLI (later calls have higher priority)
+# Load from file, then CLI — later calls win
 eafig.load("config/default.yaml")
 eafig.from_cli()
 
-# Constructor args take highest priority
+# Constructor args overridden by loaded values
 config = MyConfig(a=5)
 sub = MySubConfig()
 
-# Save back to a file
+# Save to file
 eafig.save("config/saved_config.yaml")
 ```
 
 ## Config Loading Order
 
-Later sources win:
-
 ```
-file (load)  <  CLI (from_cli)  <  constructor args
+defaults  <  constructor args  <  file (load)  <  CLI (from_cli)
 ```
 
-### Load from YAML
+Each layer overrides the one before it. Among `load()` / `from_cli()` calls, later calls win.
 
-```yaml
-# config/default.yaml
-a: 12
-sub_config:
-  x: from_file
-  y: from_file
-```
+### `keep_cli`
 
-### Override via CLI
-
-```bash
-python main.py --a 42 --sub_config.x cli_value
-```
-
-### Override via constructor
+A later `load()` normally overrides CLI values. Pass `keep_cli=True` to lock CLI on top:
 
 ```python
-config = MyConfig(a=5)  # 5 wins over both file and CLI
+eafig.from_cli()
+eafig.load("config.yaml", keep_cli=True)  # CLI stays above file
 ```
 
 ## Nested Configs
+
+`@configclass` supports dot-separated names for deep nesting:
 
 ```python
 @configclass(name="model")
@@ -79,33 +68,28 @@ class ModelConfig:
     hidden_dim: int = 256
     num_layers: int = 3
 
+
+@configclass(name="model.optimizer")
+class OptimizerConfig:
+    lr: float = 1e-3
+
+
 @configclass(name="training")
 class TrainingConfig:
-    lr: float = 1e-3
     batch_size: int = 32
+    epochs: int = 100
+
 
 @rootconfig
 class Root:
     seed: int = 42
 ```
 
-Corresponding YAML:
-
-```yaml
-seed: 42
-model:
-  hidden_dim: 512
-  num_layers: 6
-training:
-  lr: 5e-4
-  batch_size: 64
-```
-
-CLI override with dot notation: `--model.hidden_dim 1024 --training.lr 1e-3`
+CLI override: `--model.hidden_dim 1024 --model.optimizer.lr 1e-3`
 
 ## Strict Mode
 
-**Enabled by default.** Unknown keys in the loaded config raise `KeyError` at instantiation time.
+**Enabled by default.** Unknown keys raise `KeyError` at load time:
 
 ```python
 @rootconfig(strict=True)   # default
@@ -113,47 +97,75 @@ class MyConfig:
     a: int = 1
 ```
 
-If a YAML file contains `typo_key: oops`, then `MyConfig()` raises:
+If a YAML file contains `typo_key: oops`, loading raises:
 
 ```
-KeyError: Unknown configuration key(s) in root config: ['typo_key']. Known keys: ['a'].
+KeyError: Unknown key 'typo_key' in configuration file 'config.yaml'.
 ```
 
-Set `strict=False` to allow extra keys:
-
-```python
-@rootconfig(strict=False)
-class MyConfig:
-    a: int = 1
-```
-
-Each config class controls its own strict mode independently.
+Set `strict=False` to allow extra keys. Each config group controls its own strict mode independently.
 
 ## Frozen Configs
+
+**Not recursive** — each config group has its own `frozen` flag.
 
 ```python
 @rootconfig(frozen=True)
 class MyConfig:
     a: int = 42
 
-config = MyConfig()     # OK
-config = MyConfig(a=5)  # TypeError: cannot override frozen config
-config.a = 100          # FrozenInstanceError
+config = MyConfig()        # OK — uses defaults
+config = MyConfig(a=5)     # TypeError: cannot override frozen config
+config.a = 100             # FrozenInstanceError
 ```
 
-## API
+Frozen also rejects values loaded from files or CLI.
+
+## Hidden Config Groups
+
+```python
+@configclass(name="api", hidden=True)
+class ApiConfig:
+    secret_key: str = "..."
+```
+
+- `eafig.config`, `from_cli()`, `load()` exclude hidden groups
+- `eafig.save()` includes them (full persistence)
+
+## Runtime `set` / `get`
+
+```python
+eafig.set("model.hidden_dim", 1024)
+value = eafig.get("model.hidden_dim")          # 1024
+value = eafig.get("missing.key", default=0)    # 0
+```
+
+`set()` enforces schema: raises `ValueError` on config groups or frozen parents, `KeyError` on unknown keys in strict mode.
+
+## Dynamic `eafig.config`
+
+```python
+import eafig
+eafig.load("config.yaml")
+print(eafig.config)  # full config dict (hidden groups excluded)
+```
+
+## API Reference
 
 | API | Description |
 |-----|-------------|
 | `@rootconfig(frozen=False, strict=True)` | Decorate a dataclass as root config |
-| `@configclass(name, frozen=False, hidden=False, strict=True)` | Decorate a dataclass as child config |
-| `eafig.load(path, keep_cli=False)` | Load config from YAML file |
-| `eafig.from_cli(args=None)` | Parse CLI arguments (default: sys.argv[1:]) |
-| `eafig.save(path)` | Save current config to YAML |
+| `@configclass(*, name, frozen=False, hidden=False, strict=True)` | Decorate a dataclass as child config |
+| `eafig.load(path, keep_cli=False)` | Load YAML file or file-like object. Returns root dict |
+| `eafig.from_cli(args=None)` | Parse CLI args (default: `sys.argv[1:]`). Returns root dict |
+| `eafig.save(path, sort_keys=True)` | Save full config to YAML file or file-like object |
+| `eafig.set(key, value)` | Set a single value (dot-notation, schema-enforced) |
+| `eafig.get(key, default=None)` | Get a single value (dot-notation) |
+| `eafig.config` | Current full config dict (hidden excluded) |
 
 ## Examples
 
-See the [examples/](examples/) directory.
+See [examples/](examples/).
 
 ## License
 

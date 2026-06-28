@@ -1,14 +1,13 @@
-from dataclasses import dataclass, fields, is_dataclass, MISSING
+from dataclasses import asdict, dataclass, fields, is_dataclass, MISSING
 from typing import Any, Type, TypeVar, cast, dataclass_transform
 
-from . import state
+from . import state, schema
 
 T = TypeVar("T")
 
 @dataclass_transform()
 def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: bool = True):
-    """
-    Register a dataclass as the root configuration.
+    """Register a dataclass as the root configuration.
 
     Args:
         frozen: If True, the dataclass will be frozen (immutable). Default is False.
@@ -18,9 +17,9 @@ def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: b
         if not is_dataclass(cls):
             cls = dataclass(cls, frozen=frozen)
 
-        state.set_root_strict(strict)
+        schema.register_schema(cls, path=None, frozen=frozen, strict=strict)
 
-        # Store the original __init__method to call it later
+        # Store the original __init__ method to call it later
         original_init = cls.__init__
         new_cls = cast(Type[Any], cls)
 
@@ -40,7 +39,7 @@ def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: b
                     f"Cannot provide parameters to frozen configuration '{new_cls.__name__}'"
                 )
 
-            loaded = state.get_root_config()
+            loaded = state._get_config(None, recursive=False, apply_hidden=False)
             if frozen and loaded:
                 raise TypeError(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
@@ -48,50 +47,54 @@ def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: b
 
             init_kwargs = {}
             for field in field_list:
-                if field.name in provided:
-                    init_kwargs[field.name] = provided[field.name]
-                elif field.name in loaded:
+                if field.name in loaded:
                     init_kwargs[field.name] = loaded[field.name]
+                elif field.name in provided:
+                    init_kwargs[field.name] = provided[field.name]
                 elif field.default is not MISSING:
                     init_kwargs[field.name] = field.default
                 elif field.default_factory is not MISSING:  # type: ignore
                     init_kwargs[field.name] = field.default_factory()  # type: ignore
                 else:
                     raise TypeError(
-                        f"Missing required parameter '{field.name}' for configuration '{new_cls.__name__}'"
+                        f"Missing required parameter '{field.name}' for '{new_cls.__name__}'"
                     )
 
             original_init(self, **init_kwargs)
-            state.set_root_config(self)
+            state._set_config(None, asdict(self))
 
         new_cls.__init__ = new_init
         return new_cls
 
-    if cls is not None:
-        return wrapper(cls)
-    else:
+    if cls is None:
         return wrapper
+    else:
+        return wrapper(cls)
 
 
-def configclass(cls: Type[T] | None = None, /, *, name: str, frozen: bool = False, hidden: bool = False, strict: bool = True):
-    """
-    Register a dataclass as a child configuration.
+
+@dataclass_transform()
+def configclass(*, name: str, frozen: bool = False, hidden: bool = False, strict: bool = True):
+    """Register a dataclass as a configuration class.
 
     Args:
-        name: The name of the child configuration.
+        name: The name of the configuration class in dot-separated format.
         frozen: If True, the dataclass will be frozen (immutable). Default is False.
-        hidden: If True, the configuration will be hidden when exported. Default is False.
-        strict: If True, unknown keys in this child configuration will raise an error. Default is True.
+        hidden: If True, the configuration class will be hidden from the final configuration. Default is False.
+        strict: If True, unknown keys in the configuration class will raise an error. Default is True.
     """
+    if name == "":
+        raise ValueError("The 'name' parameter cannot be an empty string.")
+
     def wrapper(cls: Type[T]) -> Type[T]:
         if not is_dataclass(cls):
             cls = dataclass(cls, frozen=frozen)
 
-        # Store the original __init__method to call it later
+        schema.register_schema(cls, path=name, frozen=frozen, hidden=hidden, strict=strict)
+
+        # Store the original __init__ method to call it later
         original_init = cls.__init__
         new_cls = cast(Type[Any], cls)
-
-        state.register_config(name, hidden=hidden, strict=strict)
 
         def new_init(self, *args, **kwargs) -> None:
             # Validate positional arguments
@@ -109,7 +112,7 @@ def configclass(cls: Type[T] | None = None, /, *, name: str, frozen: bool = Fals
                     f"Cannot provide parameters to frozen configuration '{new_cls.__name__}'"
                 )
 
-            loaded = state.get_child_config(name)
+            loaded = state._get_config(name, recursive=False, apply_hidden=False)
             if frozen and loaded:
                 raise TypeError(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
@@ -117,10 +120,10 @@ def configclass(cls: Type[T] | None = None, /, *, name: str, frozen: bool = Fals
 
             init_kwargs = {}
             for field in field_list:
-                if field.name in provided:
-                    init_kwargs[field.name] = provided[field.name]
-                elif field.name in loaded:
+                if field.name in loaded:
                     init_kwargs[field.name] = loaded[field.name]
+                elif field.name in provided:
+                    init_kwargs[field.name] = provided[field.name]
                 elif field.default is not MISSING:
                     init_kwargs[field.name] = field.default
                 elif field.default_factory is not MISSING:  # type: ignore
@@ -131,12 +134,9 @@ def configclass(cls: Type[T] | None = None, /, *, name: str, frozen: bool = Fals
                     )
 
             original_init(self, **init_kwargs)
-            state.set_child_config(name, self, hidden=hidden)
+            state._set_config(name, asdict(self))
 
         new_cls.__init__ = new_init
         return new_cls
 
-    if cls is not None:
-        return wrapper(cls)
-    else:
-        return wrapper
+    return wrapper

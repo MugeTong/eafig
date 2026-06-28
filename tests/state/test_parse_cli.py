@@ -1,6 +1,25 @@
+import dataclasses
 import pytest
-from eafig import state
 from omegaconf import OmegaConf
+
+from eafig import state, schema
+
+
+def _reset() -> None:
+    """Reset global state between tests."""
+    state._stored_config = OmegaConf.create({})
+    root = schema._schema_root
+    root.fields.clear()
+    root.children.clear()
+    root.strict = True
+    root.frozen = False
+    root.hidden = False
+
+
+def _register_dummy_root() -> None:
+    """Register an empty root schema with strict=False to accept any key."""
+    Dummy = dataclasses.make_dataclass("_Dummy", [])
+    schema.register_schema(Dummy, path=None, strict=False)
 
 
 @pytest.mark.parametrize(
@@ -28,32 +47,32 @@ from omegaconf import OmegaConf
     ],
 )
 def test_parse_cli(args_list, expected):
-    state._stored_config = OmegaConf.create({})
+    """CLI parsing with a permissive (strict=False) root accepts any key."""
+    _reset()
+    _register_dummy_root()
     state.parse_cli(args_list)
     assert OmegaConf.to_container(state._stored_config, resolve=True) == expected
 
 
 def test_parse_cli_raises_when_registered_path_is_scalar() -> None:
-    state._stored_config = OmegaConf.create({})
-    state._registered = {"model": state.RegisteredConfig(hidden=False)}
+    """A registered config group path must resolve to a dict, not a scalar."""
+    _reset()
+    Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
+    schema.register_schema(Model, path="model")
 
-    try:
-        with pytest.raises(
-            TypeError, match="Registered path 'model' must resolve to a dict"
-        ):
-            state.parse_cli(["--model", "asdfa"])
-    finally:
-        state._registered = {}
+    with pytest.raises(
+        TypeError, match="Path 'model' is registered as a config group"
+    ):
+        state.parse_cli(["--model", "asdfa"])
 
 
 def test_parse_cli_raises_when_registered_nested_path_parent_is_scalar() -> None:
-    state._stored_config = OmegaConf.create({})
-    state._registered = {"model.optimizer": state.RegisteredConfig(hidden=False)}
+    """A nested registered path like model.optimizer requires model to be a dict."""
+    _reset()
+    Optimizer = dataclasses.make_dataclass("_Optimizer", [("lr", float)])
+    schema.register_schema(Optimizer, path="model.optimizer")
 
-    try:
-        with pytest.raises(
-            TypeError, match="Registered path 'model.optimizer' must resolve to a dict"
-        ):
-            state.parse_cli(["--model", "asdfa"])
-    finally:
-        state._registered = {}
+    with pytest.raises(
+        TypeError, match="Path 'model' is registered as a config group"
+    ):
+        state.parse_cli(["--model", "asdfa"])
