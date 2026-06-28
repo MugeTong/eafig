@@ -3,7 +3,7 @@ from typing import IO, Any, Callable, TypeVar, overload
 
 T = TypeVar("T")
 
-config: dict
+config: dict[str, Any] = ...  # This will be dynamically populated with the current configuration
 
 def from_cli() -> dict: ...
 def load(path: str | Path | IO[Any], keep_cli: bool = False) -> dict: ...
