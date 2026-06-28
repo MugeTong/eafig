@@ -227,7 +227,7 @@ class TestSave:
         output = buf.getvalue()
         assert "seed: 42" in output
 
-    def test_save_includes_hidden_when_apply_hidden_true(self) -> None:
+    def test_save_includes_hidden_when_include_hidden_true(self) -> None:
         """save applies hidden=True, so hidden config groups are included."""
         _reset()
         Dummy = dataclasses.make_dataclass("_Dummy", [])

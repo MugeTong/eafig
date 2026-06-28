@@ -39,7 +39,7 @@ def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: b
                     f"Cannot provide parameters to frozen configuration '{new_cls.__name__}'"
                 )
 
-            loaded = state._get_config(None, recursive=False, apply_hidden=False)
+            loaded = state._get_config(None, recursive=False, include_hidden=True)
             if frozen and loaded:
                 raise TypeError(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
@@ -112,7 +112,7 @@ def configclass(*, name: str, frozen: bool = False, hidden: bool = False, strict
                     f"Cannot provide parameters to frozen configuration '{new_cls.__name__}'"
                 )
 
-            loaded = state._get_config(name, recursive=False, apply_hidden=False)
+            loaded = state._get_config(name, recursive=False, include_hidden=True)
             if frozen and loaded:
                 raise TypeError(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"

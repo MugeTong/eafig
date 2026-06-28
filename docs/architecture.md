@@ -67,7 +67,7 @@ MyConfig(a=5)                    _stored_config
 _get_config(path)
        │
        ▼
-  _extract(config_node, schema_node, recursive, apply_hidden)
+  _extract(config_node, schema_node, recursive, include_hidden)
        │
        ├── fields:   extract from config_node if present
        ├── children: recurse per schema, respect hidden
@@ -109,7 +109,7 @@ Each node carries:
 |-----------|------|---------|-------------|
 | `name` | `str` | — | The key name for this config group |
 | `frozen` | `bool` | `False` | If True, this group's fields cannot be modified via `set()` or constructor overrides |
-| `hidden` | `bool` | `False` | If True, excluded from output when `apply_hidden=False` |
+| `hidden` | `bool` | `False` | If True, excluded from output when `include_hidden=False` |
 | `strict` | `bool` | `True` | If True, unknown keys under this group raise `KeyError` |
 | `fields` | `set[str]` | `set()` | Field names declared by the dataclass at this path |
 | `children` | `dict[str, ConfigSchema]` | `{}` | Registered sub-config groups |

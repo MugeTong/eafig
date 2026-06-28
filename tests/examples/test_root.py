@@ -29,7 +29,7 @@ def test_set_root_config():
         "train": {"epochs": 30},
         "debug": True,
     }
-    assert state._get_config(None, recursive=True, apply_hidden=True) == {
+    assert state._get_config(None, recursive=True, include_hidden=True) == {
         "train": {"epochs": 30},
         "debug": True,
     }

@@ -65,8 +65,8 @@ def test_get_config_child_group_raises_for_unregistered_path() -> None:
 
 # ── Hidden config groups ──────────────────────────────────────────────
 
-def test_get_config_apply_hidden_false_hides_children() -> None:
-    """When apply_hidden is False, hidden children are excluded."""
+def test_get_config_include_hidden_false_hides_children() -> None:
+    """When include_hidden is False, hidden children are excluded."""
     _reset()
     Dummy = dataclasses.make_dataclass("_Dummy", [])
     schema.register_schema(Dummy, path=None, strict=False)
@@ -79,13 +79,13 @@ def test_get_config_apply_hidden_false_hides_children() -> None:
     state._set_config("visible", {"x": 1})
     state._set_config("hidden", {"secret": "shh"})
 
-    result = state._get_config(None, apply_hidden=False)
+    result = state._get_config(None, include_hidden=False)
     assert "visible" in result
     assert "hidden" not in result
 
 
-def test_get_config_apply_hidden_true_includes_hidden() -> None:
-    """When apply_hidden is True, hidden children are included."""
+def test_get_config_include_hidden_true_includes_hidden() -> None:
+    """When include_hidden is True, hidden children are included."""
     _reset()
     Dummy = dataclasses.make_dataclass("_Dummy", [])
     schema.register_schema(Dummy, path=None, strict=False)
@@ -95,7 +95,7 @@ def test_get_config_apply_hidden_true_includes_hidden() -> None:
 
     state._set_config("hidden", {"secret": "shh"})
 
-    result = state._get_config(None, apply_hidden=True)
+    result = state._get_config(None, include_hidden=True)
     assert "hidden" in result
     assert result["hidden"] == {"secret": "shh"}
 
@@ -116,7 +116,7 @@ def test_get_config_hidden_deep_child_filtered() -> None:
 
     state._set_config("parent.child", {"secret": "shh"})
 
-    result = state._get_config(None, recursive=False, apply_hidden=False)
+    result = state._get_config(None, recursive=False, include_hidden=False)
     # parent should be present, but its hidden child should NOT appear
     assert "parent" in result
     assert "child" not in result["parent"]

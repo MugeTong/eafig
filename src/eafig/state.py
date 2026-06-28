@@ -89,13 +89,13 @@ def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
         _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, raw))
 
 
-def _get_config(path: str | None = None, recursive: bool = False, apply_hidden: bool = False) -> dict:
+def _get_config(path: str | None = None, recursive: bool = False, include_hidden: bool = False) -> dict:
     """Get the configuration at the specified path.
 
     Args:
         path (str | None): The dot-separated path to the configuration. Default is None (root).
         recursive (bool): If True, retrieves the configuration recursively. Default is False.
-        apply_hidden (bool): If True, includes hidden configurations. Default is False.
+        include_hidden (bool): If True, includes hidden configurations. Default is False.
     """
     # Locate the schema node corresponding to the given path
     schema_node = _schema_root
@@ -113,14 +113,14 @@ def _get_config(path: str | None = None, recursive: bool = False, apply_hidden: 
     else:
         config_node = _stored_config
 
-    return _extract(config_node, schema_node, recursive=recursive, apply_hidden=apply_hidden)
+    return _extract(config_node, schema_node, recursive=recursive, include_hidden=include_hidden)
 
 
 def _extract(
     config_node: DictConfig,
     schema_node: ConfigSchema,
     recursive: bool,
-    apply_hidden: bool,
+    include_hidden: bool,
 ) -> dict:
     result = {}
     for field in schema_node.fields:
@@ -133,7 +133,7 @@ def _extract(
             )
 
     for key, child_schema in schema_node.children.items():
-        if not apply_hidden and child_schema.hidden:
+        if not include_hidden and child_schema.hidden:
             continue
         if key not in config_node:
             continue
@@ -141,7 +141,7 @@ def _extract(
         value = config_node[key]
 
         if child_schema.children:
-            result[key] = _extract(value, child_schema, recursive=recursive, apply_hidden=apply_hidden)
+            result[key] = _extract(value, child_schema, recursive=recursive, include_hidden=include_hidden)
         elif OmegaConf.is_config(value):
             result[key] = OmegaConf.to_container(value, resolve=True)
         else:

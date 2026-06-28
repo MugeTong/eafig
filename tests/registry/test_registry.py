@@ -207,7 +207,7 @@ class TestConfigclass:
                 x: int = 1
 
     def test_hidden_configclass_not_in_normal_output(self) -> None:
-        """A hidden configclass is excluded when apply_hidden=False."""
+        """A hidden configclass is excluded when include_hidden=False."""
         _reset()
         Dummy = dataclasses.make_dataclass("_Dummy", [])
         schema.register_schema(Dummy, path=None, strict=False)
@@ -223,7 +223,7 @@ class TestConfigclass:
         VisibleConfig()
         InternalConfig()
 
-        result = state._get_config(None, recursive=True, apply_hidden=False)
+        result = state._get_config(None, recursive=True, include_hidden=False)
         assert "visible" in result
         assert "internal" not in result
 
