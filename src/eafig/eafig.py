@@ -5,6 +5,7 @@ from omegaconf import OmegaConf
 
 from . import state, schema
 
+
 def __getattr__(name: str) -> Any:
     if name == "config":
         return state._get_config(None, recursive=True, include_hidden=True)
@@ -57,6 +58,7 @@ def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:
     else:
         file_path.write(OmegaConf.to_yaml(config, sort_keys=sort_keys))
 
+
 def set(key: str, value: Any) -> None:
     """Set a configuration value in the current state.
 
@@ -83,7 +85,7 @@ def set(key: str, value: Any) -> None:
         if part not in node.children and part not in node.fields:
             if node.strict:
                 raise KeyError(
-                    f"Unknown key '{'.'.join(parts[:i+1])}' is not registered in schema."
+                    f"Unknown key '{'.'.join(parts[: i + 1])}' is not registered in schema."
                 )
             else:
                 break
@@ -97,6 +99,7 @@ def set(key: str, value: Any) -> None:
                 raise ValueError(f"Cannot set '{key}': '{part}' is frozen.")
 
     OmegaConf.update(state._stored_config, key, value)
+
 
 def get(key: str, default: Any = None) -> Any:
     """Get a configuration value from the current state.

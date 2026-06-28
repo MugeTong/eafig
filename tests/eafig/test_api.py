@@ -25,6 +25,7 @@ def _reset() -> None:
 
 # ── set() ─────────────────────────────────────────────────────────────
 
+
 class TestSet:
     def test_set_leaf_field(self) -> None:
         """Set a simple leaf field on a non-frozen config group."""
@@ -112,6 +113,7 @@ class TestSet:
 
 # ── get() ─────────────────────────────────────────────────────────────
 
+
 class TestGet:
     def test_get_returns_value(self) -> None:
         """get returns a stored value."""
@@ -138,6 +140,7 @@ class TestGet:
 
 # ── from_cli() ────────────────────────────────────────────────────────
 
+
 class TestFromCli:
     def test_from_cli_parses_flat_args(self) -> None:
         """from_cli parses dotted args into config, returning root dict."""
@@ -160,6 +163,7 @@ class TestFromCli:
 
 
 # ── load() ────────────────────────────────────────────────────────────
+
 
 class TestLoad:
     def test_load_reads_yaml(self) -> None:
@@ -195,6 +199,7 @@ class TestLoad:
 
 # ── save() ────────────────────────────────────────────────────────────
 
+
 class TestSave:
     def test_save_writes_yaml_to_file(self) -> None:
         """save writes full config as YAML to a file path."""
@@ -204,7 +209,9 @@ class TestSave:
 
         state._set_config(None, {"seed": 42})
 
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".yaml", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w+", suffix=".yaml", delete=False
+        ) as tmp:
             tmp_path = Path(tmp.name)
 
         try:
@@ -246,7 +253,9 @@ class TestSave:
     def test_save_sort_keys(self) -> None:
         """save sorts keys alphabetically by default."""
         _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [("c", int), ("a", int), ("b", int)])
+        Dummy = dataclasses.make_dataclass(
+            "_Dummy", [("c", int), ("a", int), ("b", int)]
+        )
         schema.register_schema(Dummy, path=None)
 
         state._set_config(None, {"c": 3, "a": 1, "b": 2})

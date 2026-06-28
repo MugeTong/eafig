@@ -18,6 +18,7 @@ def _reset() -> None:
 
 # ── Root-level strict mode ───────────────────────────────────────────
 
+
 def test_validate_root_strict_rejects_unknown_key() -> None:
     """When the root is strict, unknown top-level keys raise KeyError."""
     _reset()
@@ -25,6 +26,7 @@ def test_validate_root_strict_rejects_unknown_key() -> None:
     schema.register_schema(Dummy, path=None, strict=True)
 
     from omegaconf import OmegaConf
+
     cfg = OmegaConf.create({"seed": 42, "unknown": "oops"})
     with pytest.raises(KeyError, match="Unknown key 'unknown'"):
         state._validate(cfg, "test source")
@@ -51,6 +53,7 @@ def test_validate_root_strict_empty_schema_allows_any() -> None:
 
 
 # ── Child config group strict mode ────────────────────────────────────
+
 
 def test_validate_child_strict_rejects_unknown_key() -> None:
     """A strict child config group rejects keys not in its schema."""
@@ -81,6 +84,7 @@ def test_validate_child_nonstrict_allows_unknown_keys() -> None:
 
 # ── DictConfig type check for registered paths ─────────────────────────
 
+
 def test_validate_registered_path_must_be_dict() -> None:
     """A path registered as a config group must resolve to a DictConfig."""
     _reset()
@@ -106,6 +110,7 @@ def test_validate_registered_nested_path_parent_must_be_dict() -> None:
 
 # ── Missing registered paths are allowed ───────────────────────────────
 
+
 def test_validate_allows_missing_registered_path() -> None:
     """A config that does not contain a registered path is still valid."""
     _reset()
@@ -120,6 +125,7 @@ def test_validate_allows_missing_registered_path() -> None:
 
 
 # ── Nested config groups ───────────────────────────────────────────────
+
 
 def test_validate_nested_strict_group() -> None:
     """Strict validation recurses into nested child groups."""

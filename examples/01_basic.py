@@ -4,6 +4,7 @@ Basic usage: define a root config, set values via constructor, save to file.
 Run:
     python examples/01_basic.py
 """
+
 import eafig
 from eafig import rootconfig
 

@@ -22,6 +22,7 @@ def _reset() -> None:
 
 # ── rootconfig ────────────────────────────────────────────────────────
 
+
 class TestRootconfig:
     def test_basic_instantiation(self) -> None:
         """rootconfig registers schema and stores config on instantiation."""
@@ -144,6 +145,7 @@ class TestRootconfig:
 
 
 # ── configclass ───────────────────────────────────────────────────────
+
 
 class TestConfigclass:
     def test_basic_instantiation(self) -> None:

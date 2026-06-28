@@ -5,14 +5,18 @@ from . import state, schema
 
 T = TypeVar("T")
 
+
 @dataclass_transform()
-def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: bool = True):
+def rootconfig(
+    cls: Type[T] | None = None, /, *, frozen: bool = False, strict: bool = True
+):
     """Register a dataclass as the root configuration.
 
     Args:
         frozen: If True, the dataclass will be frozen (immutable). Default is False.
         strict: If True, unknown keys in the root configuration will raise an error. Default is True.
     """
+
     def wrapper(cls: Type[T]) -> Type[T]:
         if not is_dataclass(cls):
             cls = dataclass(cls, frozen=frozen)
@@ -72,9 +76,10 @@ def rootconfig(cls: Type[T] | None = None, /, *, frozen: bool = False, strict: b
         return wrapper(cls)
 
 
-
 @dataclass_transform()
-def configclass(*, name: str, frozen: bool = False, hidden: bool = False, strict: bool = True):
+def configclass(
+    *, name: str, frozen: bool = False, hidden: bool = False, strict: bool = True
+):
     """Register a dataclass as a configuration class.
 
     Args:
@@ -90,7 +95,9 @@ def configclass(*, name: str, frozen: bool = False, hidden: bool = False, strict
         if not is_dataclass(cls):
             cls = dataclass(cls, frozen=frozen)
 
-        schema.register_schema(cls, path=name, frozen=frozen, hidden=hidden, strict=strict)
+        schema.register_schema(
+            cls, path=name, frozen=frozen, hidden=hidden, strict=strict
+        )
 
         # Store the original __init__ method to call it later
         original_init = cls.__init__

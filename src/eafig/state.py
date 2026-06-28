@@ -35,6 +35,7 @@ def _validate(config: DictConfig, source: str) -> None:
                 if key not in schema_node.valid_keys:
                     raise KeyError(f"Unknown key '{path}.{key}' in {source}.")
 
+
 def parse_cli(args_list: list[str]) -> None:
     """Parse command line arguments and store them in the state."""
     global _stored_config
@@ -66,6 +67,7 @@ def parse_cli(args_list: list[str]) -> None:
 
     _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, cli_config))
 
+
 def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
     """Parse a configuration file and store it in the state.
 
@@ -89,7 +91,9 @@ def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
         _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, raw))
 
 
-def _get_config(path: str | None = None, recursive: bool = False, include_hidden: bool = False) -> dict:
+def _get_config(
+    path: str | None = None, recursive: bool = False, include_hidden: bool = False
+) -> dict:
     """Get the configuration at the specified path.
 
     Args:
@@ -113,7 +117,9 @@ def _get_config(path: str | None = None, recursive: bool = False, include_hidden
     else:
         config_node = _stored_config
 
-    return _extract(config_node, schema_node, recursive=recursive, include_hidden=include_hidden)
+    return _extract(
+        config_node, schema_node, recursive=recursive, include_hidden=include_hidden
+    )
 
 
 def _extract(
@@ -141,7 +147,9 @@ def _extract(
         value = config_node[key]
 
         if child_schema.children:
-            result[key] = _extract(value, child_schema, recursive=recursive, include_hidden=include_hidden)
+            result[key] = _extract(
+                value, child_schema, recursive=recursive, include_hidden=include_hidden
+            )
         elif OmegaConf.is_config(value):
             result[key] = OmegaConf.to_container(value, resolve=True)
         else:
@@ -160,9 +168,12 @@ def _extract(
 
     return result
 
+
 def _set_config(path: str | None, config: dict) -> None:
     global _stored_config
     if path is None:
-        _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, OmegaConf.create(config)))
+        _stored_config = cast(
+            DictConfig, OmegaConf.merge(_stored_config, OmegaConf.create(config))
+        )
     else:
         OmegaConf.update(_stored_config, path, config, merge=True)

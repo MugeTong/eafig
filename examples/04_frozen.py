@@ -8,6 +8,7 @@ frozen=True prevents:
 Run:
     python examples/04_frozen.py
 """
+
 import eafig
 from eafig import rootconfig, configclass
 

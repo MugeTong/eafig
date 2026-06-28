@@ -7,6 +7,7 @@ Run without arguments:
 Run with CLI overrides:
     python examples/main.py --a 42 --sub_config.x cli_value
 """
+
 import eafig
 from eafig import rootconfig, configclass
 

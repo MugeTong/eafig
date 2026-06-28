@@ -58,6 +58,7 @@ def register_schema(
 
     node.fields = fields
 
+
 def iter_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
     if path is None:
         node = _schema_root
@@ -68,7 +69,10 @@ def iter_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
 
     yield from _iter_non_leaf(node, path)
 
-def _iter_non_leaf(node: ConfigSchema, path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
+
+def _iter_non_leaf(
+    node: ConfigSchema, path: str | None = None
+) -> Iterator[tuple[str, ConfigSchema]]:
     for key, child in node.children.items():
         current_path = f"{path}.{key}" if path else key
         if child.fields or child.children:

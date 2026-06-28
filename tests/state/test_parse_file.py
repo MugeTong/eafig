@@ -63,9 +63,7 @@ def test_parse_file_raises_when_registered_path_is_scalar() -> None:
     schema.register_schema(Model, path="model")
 
     file_obj = StringIO("model: asdfa\n")
-    with pytest.raises(
-        TypeError, match="Path 'model' is registered as a config group"
-    ):
+    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
         state.parse_file(file_obj)
 
 
@@ -117,9 +115,7 @@ def test_parse_file_raises_when_registered_nested_path_parent_is_scalar() -> Non
     schema.register_schema(Optimizer, path="model.optimizer")
 
     file_obj = StringIO("model: asdfa\n")
-    with pytest.raises(
-        TypeError, match="Path 'model' is registered as a config group"
-    ):
+    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
         state.parse_file(file_obj)
 
 

@@ -60,9 +60,7 @@ def test_parse_cli_raises_when_registered_path_is_scalar() -> None:
     Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
     schema.register_schema(Model, path="model")
 
-    with pytest.raises(
-        TypeError, match="Path 'model' is registered as a config group"
-    ):
+    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
         state.parse_cli(["--model", "asdfa"])
 
 
@@ -72,7 +70,5 @@ def test_parse_cli_raises_when_registered_nested_path_parent_is_scalar() -> None
     Optimizer = dataclasses.make_dataclass("_Optimizer", [("lr", float)])
     schema.register_schema(Optimizer, path="model.optimizer")
 
-    with pytest.raises(
-        TypeError, match="Path 'model' is registered as a config group"
-    ):
+    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
         state.parse_cli(["--model", "asdfa"])

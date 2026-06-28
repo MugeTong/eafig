@@ -18,10 +18,13 @@ def _reset() -> None:
 
 # ── Basic extraction ──────────────────────────────────────────────────
 
+
 def test_get_config_root_fields() -> None:
     """Extract fields registered at the root level."""
     _reset()
-    Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int, 42), ("debug", bool, False)])
+    Dummy = dataclasses.make_dataclass(
+        "_Dummy", [("seed", int, 42), ("debug", bool, False)]
+    )
     schema.register_schema(Dummy, path=None)
 
     state._set_config(None, {"seed": 99, "debug": True})
@@ -32,7 +35,9 @@ def test_get_config_root_fields() -> None:
 def test_get_config_root_omits_unset_fields() -> None:
     """Fields that have not been set in stored_config are not included."""
     _reset()
-    Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int, 42), ("debug", bool, False)])
+    Dummy = dataclasses.make_dataclass(
+        "_Dummy", [("seed", int, 42), ("debug", bool, False)]
+    )
     schema.register_schema(Dummy, path=None)
 
     state._set_config(None, {"seed": 99})
@@ -41,6 +46,7 @@ def test_get_config_root_omits_unset_fields() -> None:
 
 
 # ── Child config groups ───────────────────────────────────────────────
+
 
 def test_get_config_child_group() -> None:
     """Extract a specific child config group by path."""
@@ -64,6 +70,7 @@ def test_get_config_child_group_raises_for_unregistered_path() -> None:
 
 
 # ── Hidden config groups ──────────────────────────────────────────────
+
 
 def test_get_config_include_hidden_false_hides_children() -> None:
     """When include_hidden is False, hidden children are excluded."""
@@ -102,6 +109,7 @@ def test_get_config_include_hidden_true_includes_hidden() -> None:
 
 # ── Deep hidden filtering ─────────────────────────────────────────────
 
+
 def test_get_config_hidden_deep_child_filtered() -> None:
     """A hidden grandchild is filtered even when parent is visible and recursive=False."""
     _reset()
@@ -123,6 +131,7 @@ def test_get_config_hidden_deep_child_filtered() -> None:
 
 
 # ── Recursive extraction ──────────────────────────────────────────────
+
 
 def test_get_config_recursive_extracts_nested() -> None:
     """recursive=True extracts nested config groups, not just top-level fields."""
@@ -168,6 +177,7 @@ def test_get_config_non_recursive_flattens_children() -> None:
 
 # ── Non-strict nodes preserve unknown keys ────────────────────────────
 
+
 def test_get_config_nonstrict_preserves_unknown_keys() -> None:
     """Non-strict nodes include keys that are not in the schema."""
     _reset()
@@ -192,6 +202,7 @@ def test_get_config_strict_excludes_unknown_keys() -> None:
 
 
 # ── _set_config ───────────────────────────────────────────────────────
+
 
 def test_set_config_root_merges() -> None:
     """_set_config at root merges into stored config."""

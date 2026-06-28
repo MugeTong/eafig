@@ -10,6 +10,7 @@ instantiation time.
 Run:
     python examples/03_strict.py
 """
+
 import tempfile, os
 import eafig
 from eafig import rootconfig, configclass

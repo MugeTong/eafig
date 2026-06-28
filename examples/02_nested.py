@@ -7,6 +7,7 @@ Run:
 To see CLI override, run with arguments:
     python examples/02_nested.py --model.hidden_dim 1024 --training.lr 5e-4
 """
+
 import eafig
 from eafig import rootconfig, configclass
 
