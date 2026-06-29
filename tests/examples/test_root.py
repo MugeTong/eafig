@@ -10,6 +10,7 @@ def _reset() -> None:
     root = schema._schema_root
     root.fields.clear()
     root.children.clear()
+    root.defaults.clear()
     root.strict = True
     root.frozen = False
     root.hidden = False

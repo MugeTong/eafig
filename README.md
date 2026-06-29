@@ -121,6 +121,23 @@ config.a = 100             # FrozenInstanceError
 
 Frozen also rejects values loaded from files or CLI.
 
+## Default Values
+
+Dataclass field defaults are automatically included in output even before
+instantiation — no need to construct every config class just to see defaults:
+
+```python
+@configclass(name="model")
+class ModelConfig:
+    hidden_dim: int = 256
+    num_layers: int = 3
+
+# model.hidden_dim and model.num_layers appear via defaults
+print(eafig.config)  # {"model": {"hidden_dim": 256, "num_layers": 3}}
+```
+
+Explicitly set values always override defaults.
+
 ## Hidden Config Groups
 
 ```python

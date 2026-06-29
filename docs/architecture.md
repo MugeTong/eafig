@@ -61,18 +61,27 @@ MyConfig(a=5)                    _stored_config
          _set_config(None, asdict(self))
 ```
 
-### Extraction (stored config → dict)
+### Extraction (stored config + schema → dict)
 
 ```
-_get_config(path)
+_get_config(path, fill_defaults)
        │
        ▼
-  _extract(config_node, schema_node, recursive, include_hidden)
+  _extract(config_node, schema_node, recursive, include_hidden, fill_defaults)
        │
-       ├── fields:   extract from config_node if present
-       ├── children: recurse per schema, respect hidden
+       ├── fields:   from config_node, fallback to schema.defaults if fill_defaults
+       ├── children: recurse per schema (respect hidden + fill_defaults)
        └── unknown:  preserve if !strict
 ```
+
+**`fill_defaults`** controls whether missing fields get their dataclass defaults:
+
+| Path | `fill_defaults` | Rationale |
+|------|:---:|-----------|
+| `eafig.config` | `True` | Show complete state to user |
+| `from_cli()` / `load()` | `True` | Return complete config |
+| `save()` | `True` | Persist everything |
+| `registry` new_init | `False` | Only explicit values participate in priority resolution |
 
 ## Global State
 
@@ -112,6 +121,7 @@ Each node carries:
 | `hidden` | `bool` | `False` | If True, excluded from output when `include_hidden=False` |
 | `strict` | `bool` | `True` | If True, unknown keys under this group raise `KeyError` |
 | `fields` | `set[str]` | `set()` | Field names declared by the dataclass at this path |
+| `defaults` | `dict[str, Any]` | `{}` | Default values extracted from dataclass fields |
 | `children` | `dict[str, ConfigSchema]` | `{}` | Registered sub-config groups |
 
 Key design decisions:

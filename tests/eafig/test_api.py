@@ -18,6 +18,7 @@ def _reset() -> None:
     root = schema._schema_root
     root.fields.clear()
     root.children.clear()
+    root.defaults.clear()
     root.strict = True
     root.frozen = False
     root.hidden = False
@@ -234,8 +235,8 @@ class TestSave:
         output = buf.getvalue()
         assert "seed: 42" in output
 
-    def test_save_includes_hidden_when_include_hidden_true(self) -> None:
-        """save applies hidden=True, so hidden config groups are included."""
+    def test_save_excludes_hidden_by_default(self) -> None:
+        """save uses include_hidden=False, so hidden config groups are excluded."""
         _reset()
         Dummy = dataclasses.make_dataclass("_Dummy", [])
         schema.register_schema(Dummy, path=None, strict=False)
@@ -248,7 +249,9 @@ class TestSave:
         buf = StringIO()
         eafig.save(buf)
         output = buf.getvalue()
-        assert "secret: shh" in output or "secret: shh\n" in output
+        # hidden_cfg should not appear in output
+        assert "hidden_cfg" not in output
+        assert "secret" not in output
 
     def test_save_sort_keys(self) -> None:
         """save sorts keys alphabetically by default."""

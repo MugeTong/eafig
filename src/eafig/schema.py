@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Iterator
+from typing import Any, Iterator
 
 
 class ConfigSchema:
@@ -15,6 +15,7 @@ class ConfigSchema:
         self.hidden = hidden
         self.strict = strict
         self.fields: set[str] = set()
+        self.defaults: dict[str, Any] = {}
         self.children: dict[str, ConfigSchema] = {}
 
     @property
@@ -57,6 +58,13 @@ def register_schema(
         )
 
     node.fields = fields
+
+    # Extract field defaults for fill_defaults support
+    for f in dataclasses.fields(cls):
+        if f.default is not dataclasses.MISSING:
+            node.defaults[f.name] = f.default
+        elif f.default_factory is not dataclasses.MISSING:  # type: ignore
+            node.defaults[f.name] = f.default_factory()  # type: ignore
 
 
 def iter_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:

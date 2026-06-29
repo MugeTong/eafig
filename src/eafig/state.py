@@ -92,7 +92,10 @@ def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
 
 
 def _get_config(
-    path: str | None = None, recursive: bool = False, include_hidden: bool = False
+    path: str | None = None,
+    recursive: bool = False,
+    include_hidden: bool = False,
+    fill_defaults: bool = False,
 ) -> dict:
     """Get the configuration at the specified path.
 
@@ -100,6 +103,7 @@ def _get_config(
         path (str | None): The dot-separated path to the configuration. Default is None (root).
         recursive (bool): If True, retrieves the configuration recursively. Default is False.
         include_hidden (bool): If True, includes hidden configurations. Default is False.
+        fill_defaults (bool): If True, fills missing fields with dataclass defaults. Default is False.
     """
     # Locate the schema node corresponding to the given path
     schema_node = _schema_root
@@ -110,15 +114,35 @@ def _get_config(
             schema_node = schema_node.children[key]
 
         if OmegaConf.is_missing(_stored_config, path):
+            if fill_defaults:
+                return _extract(
+                    OmegaConf.create({}),
+                    schema_node,
+                    recursive=recursive,
+                    include_hidden=include_hidden,
+                    fill_defaults=True,
+                )
             return {}
         config_node = OmegaConf.select(_stored_config, path)
         if config_node is None:
+            if fill_defaults:
+                return _extract(
+                    OmegaConf.create({}),
+                    schema_node,
+                    recursive=recursive,
+                    include_hidden=include_hidden,
+                    fill_defaults=True,
+                )
             return {}
     else:
         config_node = _stored_config
 
     return _extract(
-        config_node, schema_node, recursive=recursive, include_hidden=include_hidden
+        config_node,
+        schema_node,
+        recursive=recursive,
+        include_hidden=include_hidden,
+        fill_defaults=fill_defaults,
     )
 
 
@@ -127,6 +151,7 @@ def _extract(
     schema_node: ConfigSchema,
     recursive: bool,
     include_hidden: bool,
+    fill_defaults: bool = False,
 ) -> dict:
     result = {}
     for field in schema_node.fields:
@@ -137,18 +162,32 @@ def _extract(
                 if OmegaConf.is_config(value)
                 else value
             )
+        elif fill_defaults and field in schema_node.defaults:
+            result[field] = schema_node.defaults[field]
 
     for key, child_schema in schema_node.children.items():
         if not include_hidden and child_schema.hidden:
             continue
         if key not in config_node:
+            if fill_defaults and (child_schema.fields or child_schema.children):
+                result[key] = _extract(
+                    OmegaConf.create({}),
+                    child_schema,
+                    recursive=recursive,
+                    include_hidden=include_hidden,
+                    fill_defaults=True,
+                )
             continue
 
         value = config_node[key]
 
-        if child_schema.children:
+        if child_schema.children or (fill_defaults and child_schema.fields):
             result[key] = _extract(
-                value, child_schema, recursive=recursive, include_hidden=include_hidden
+                value,
+                child_schema,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                fill_defaults=fill_defaults,
             )
         elif OmegaConf.is_config(value):
             result[key] = OmegaConf.to_container(value, resolve=True)

@@ -8,7 +8,7 @@ from . import state, schema
 
 def __getattr__(name: str) -> Any:
     if name == "config":
-        return state._get_config(None, recursive=True, include_hidden=True)
+        return state._get_config(None, recursive=True, include_hidden=True, fill_defaults=True)
     raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
@@ -27,7 +27,7 @@ def from_cli(args_list: list[str] | None = None) -> dict:
 
     state.parse_cli(args_list)
 
-    return state._get_config(None, recursive=False, include_hidden=False)
+    return state._get_config(None, recursive=False, include_hidden=True, fill_defaults=True)
 
 
 def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict:
@@ -41,7 +41,7 @@ def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict:
     """
     state.parse_file(file_path, keep_cli)
 
-    return state._get_config(None, recursive=False, include_hidden=False)
+    return state._get_config(None, recursive=False, include_hidden=True, fill_defaults=True)
 
 
 def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:
@@ -51,7 +51,7 @@ def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:
         file_path: The path to the file where the configuration will be saved.
         sort_keys: If True, keys will be sorted alphabetically. Default is True.
     """
-    config = state._get_config(None, recursive=True, include_hidden=True)
+    config = state._get_config(None, recursive=True, include_hidden=False, fill_defaults=True)
     if isinstance(file_path, (str, Path)):
         with open(file_path, "w") as f:
             f.write(OmegaConf.to_yaml(config, sort_keys=sort_keys))
