@@ -2,6 +2,7 @@ from omegaconf import OmegaConf
 
 from eafig import state, schema
 from eafig.registry import rootconfig
+import eafig
 
 
 def _reset() -> None:
@@ -24,7 +25,9 @@ def test_set_root_config():
         train: dict
         debug: bool
 
-    config_instance = Config(train={"epochs": 30}, debug=True)
+    eafig.set("train", {"epochs": 30})
+    eafig.set("debug", True)
+    config_instance = Config()
 
     assert OmegaConf.to_container(state._stored_config, resolve=True) == {
         "train": {"epochs": 30},

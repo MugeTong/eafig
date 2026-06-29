@@ -2,8 +2,10 @@
 Frozen configs: lock configuration against runtime changes.
 
 frozen=True prevents:
-  - Constructor overrides (raises TypeError)
+  - Loading values from file/CLI (raises TypeError)
   - Attribute mutation after creation (raises FrozenInstanceError)
+
+Note: all config classes reject constructor arguments — use eafig.set() instead.
 
 Run:
     python examples/04_frozen.py
@@ -29,12 +31,12 @@ class FrozenChild:
     y: str = "fixed"
 
 
-# ── Frozen: no constructor overrides allowed ───────────────────
+# ── Constructor arguments rejected on all config classes ─────────
 try:
     FrozenRoot(seed=999)
-    print("Unexpected: constructor override accepted on frozen config")
+    print("Unexpected: constructor args accepted")
 except TypeError as e:
-    print(f"[EXPECTED] Constructor blocked: {e}")
+    print(f"[EXPECTED] Constructor args blocked: {e}")
 
 # ── Frozen: create with defaults is fine ────────────────────────
 root = FrozenRoot()

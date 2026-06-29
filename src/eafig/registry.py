@@ -28,19 +28,10 @@ def rootconfig(
         new_cls = cast(Type[Any], cls)
 
         def new_init(self, *args, **kwargs) -> None:
-            # Validate positional arguments
-            field_list = list(fields(new_cls))
-            if len(args) > len(field_list):
+            if args or kwargs:
                 raise TypeError(
-                    f"Too many positional arguments for '{new_cls.__name__}'"
-                )
-
-            # Parameters provided via class instantiation
-            provided = {field_list[i].name: arg for i, arg in enumerate(args)}
-            provided.update(kwargs)
-            if frozen and provided:
-                raise TypeError(
-                    f"Cannot provide parameters to frozen configuration '{new_cls.__name__}'"
+                    f"'{new_cls.__name__}' does not accept constructor arguments. "
+                    f"Use eafig.set() or file/CLI loading to provide values."
                 )
 
             loaded = state._get_config(None, recursive=False, include_hidden=True)
@@ -49,12 +40,11 @@ def rootconfig(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
                 )
 
+            field_list = list(fields(new_cls))
             init_kwargs = {}
             for field in field_list:
                 if field.name in loaded:
                     init_kwargs[field.name] = loaded[field.name]
-                elif field.name in provided:
-                    init_kwargs[field.name] = provided[field.name]
                 elif field.default is not MISSING:
                     init_kwargs[field.name] = field.default
                 elif field.default_factory is not MISSING:  # type: ignore
@@ -104,19 +94,10 @@ def configclass(
         new_cls = cast(Type[Any], cls)
 
         def new_init(self, *args, **kwargs) -> None:
-            # Validate positional arguments
-            field_list = list(fields(new_cls))
-            if len(args) > len(field_list):
+            if args or kwargs:
                 raise TypeError(
-                    f"Too many positional arguments for '{new_cls.__name__}'"
-                )
-
-            # Parameters provided via class instantiation
-            provided = {field_list[i].name: arg for i, arg in enumerate(args)}
-            provided.update(kwargs)
-            if frozen and provided:
-                raise TypeError(
-                    f"Cannot provide parameters to frozen configuration '{new_cls.__name__}'"
+                    f"'{new_cls.__name__}' does not accept constructor arguments. "
+                    f"Use eafig.set() or file/CLI loading to provide values."
                 )
 
             loaded = state._get_config(name, recursive=False, include_hidden=True)
@@ -125,12 +106,11 @@ def configclass(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
                 )
 
+            field_list = list(fields(new_cls))
             init_kwargs = {}
             for field in field_list:
                 if field.name in loaded:
                     init_kwargs[field.name] = loaded[field.name]
-                elif field.name in provided:
-                    init_kwargs[field.name] = provided[field.name]
                 elif field.default is not MISSING:
                     init_kwargs[field.name] = field.default
                 elif field.default_factory is not MISSING:  # type: ignore

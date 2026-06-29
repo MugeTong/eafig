@@ -25,13 +25,12 @@ class MySubConfig:
 
 
 # Load config from a file or command line arguments
-# The function call order decides the parameter loading priority,
-# with later calls having higher priority.
+# Later calls have higher priority.
 eafig.load("config/default.yaml")
 eafig.from_cli()
 
-# Create a config instance using the loaded config
-config_instance = MyConfig(a=5)
+# Instantiate — values come from file/CLI or defaults
+config_instance = MyConfig()
 sub_config_instance = MySubConfig()
 
 print(f"a: {config_instance.a}")

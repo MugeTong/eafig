@@ -34,7 +34,8 @@ class TestRootconfig:
             seed: int = 42
             debug: bool = False
 
-        cfg = Config(seed=99)
+        state._set_config(None, {"seed": 99})
+        cfg = Config()
         assert cfg.seed == 99
         assert cfg.debug is False
         stored = OmegaConf.to_container(state._stored_config, resolve=True)
@@ -64,26 +65,26 @@ class TestRootconfig:
         with pytest.raises(TypeError, match="Missing required parameter 'seed'"):
             Config()
 
-    def test_too_many_positional_args_raises(self) -> None:
-        """More positional args than fields raises TypeError."""
+    def test_constructor_args_rejected(self) -> None:
+        """Constructor arguments are rejected; use eafig.set() instead."""
         _reset()
 
         @rootconfig
         class Config:
             a: int = 1
 
-        with pytest.raises(TypeError, match="Too many positional arguments"):
-            Config(1, 2)
+        with pytest.raises(TypeError, match="does not accept constructor arguments"):
+            Config(1)
 
     def test_frozen_rejects_constructor_args(self) -> None:
-        """A frozen rootconfig rejects constructor overrides."""
+        """A frozen rootconfig rejects constructor arguments just like non-frozen."""
         _reset()
 
         @rootconfig(frozen=True)
         class Config:
             seed: int = 42
 
-        with pytest.raises(TypeError, match="Cannot provide parameters to frozen"):
+        with pytest.raises(TypeError, match="does not accept constructor arguments"):
             Config(seed=99)
 
     def test_frozen_rejects_loaded_values(self) -> None:
@@ -121,8 +122,8 @@ class TestRootconfig:
         cfg = Config()
         assert cfg.seed == 999
 
-    def test_loaded_values_override_constructor_args(self) -> None:
-        """Values loaded from file/CLI take highest priority, over constructor args."""
+    def test_loaded_overrides_default(self) -> None:
+        """Loaded values override dataclass defaults."""
         _reset()
         state._set_config(None, {"seed": 999})
 
@@ -130,19 +131,8 @@ class TestRootconfig:
         class Config:
             seed: int = 42
 
-        cfg = Config(seed=555)
-        assert cfg.seed == 999  # loaded wins over constructor
-
-    def test_constructor_args_used_when_not_loaded(self) -> None:
-        """Constructor args are used when no value is loaded from file/CLI."""
-        _reset()
-
-        @rootconfig
-        class Config:
-            seed: int = 42
-
-        cfg = Config(seed=555)
-        assert cfg.seed == 555  # constructor used since nothing loaded
+        cfg = Config()
+        assert cfg.seed == 999
 
 
 # ── configclass ───────────────────────────────────────────────────────
@@ -158,7 +148,8 @@ class TestConfigclass:
             hidden: int = 256
             lr: float = 0.001
 
-        cfg = ModelConfig(hidden=512)
+        state._set_config("model", {"hidden": 512})
+        cfg = ModelConfig()
         assert cfg.hidden == 512
         assert cfg.lr == 0.001
 
@@ -231,14 +222,14 @@ class TestConfigclass:
         assert "internal" not in result
 
     def test_frozen_configclass_rejects_overrides(self) -> None:
-        """A frozen configclass rejects constructor overrides."""
+        """A frozen configclass rejects constructor arguments."""
         _reset()
 
         @configclass(name="model", frozen=True)
         class ModelConfig:
             hidden: int = 256
 
-        with pytest.raises(TypeError, match="Cannot provide parameters to frozen"):
+        with pytest.raises(TypeError, match="does not accept constructor arguments"):
             ModelConfig(hidden=512)
 
     def test_frozen_configclass_rejects_loaded_values(self) -> None:
@@ -253,29 +244,6 @@ class TestConfigclass:
         with pytest.raises(TypeError, match="Cannot load parameters into frozen"):
             ModelConfig()
 
-    def test_configclass_loaded_overrides_constructor(self) -> None:
-        """Loaded values (file/CLI) take priority over configclass constructor args."""
-        _reset()
-        state._set_config("model", {"hidden": 999})
-
-        @configclass(name="model")
-        class ModelConfig:
-            hidden: int = 256
-
-        cfg = ModelConfig(hidden=512)
-        assert cfg.hidden == 999  # loaded wins over constructor
-
-    def test_configclass_constructor_used_when_not_loaded(self) -> None:
-        """Constructor args are used for configclass when nothing is loaded."""
-        _reset()
-
-        @configclass(name="model")
-        class ModelConfig:
-            hidden: int = 256
-
-        cfg = ModelConfig(hidden=512)
-        assert cfg.hidden == 512  # constructor used since nothing loaded
-
     def test_configclass_loaded_overrides_default(self) -> None:
         """Loaded values override configclass field defaults."""
         _reset()
@@ -289,9 +257,8 @@ class TestConfigclass:
         assert cfg.hidden == 999
 
     def test_full_priority_chain(self) -> None:
-        """Priority: loaded > constructor > default (lowest)."""
+        """Priority: loaded > defaults. No constructor args."""
         _reset()
-        # Loaded values for some fields
         state._set_config(None, {"seed": 999})
         state._set_config("model", {"hidden": 888})
 
@@ -305,17 +272,17 @@ class TestConfigclass:
             hidden: int = 256
             lr: float = 0.001
 
-        root = Root(seed=555, debug=True)
-        model = ModelConfig(hidden=777, lr=0.01)
+        root = Root()
+        model = ModelConfig()
 
-        # model.hidden: loaded=888 beats constructor=777
-        assert model.hidden == 888
-        # model.lr: nothing loaded, constructor=0.01 beats default=0.001
-        assert model.lr == 0.01
-        # root.seed: loaded=999 beats constructor=555
+        # root.seed: loaded=999 beats default=42
         assert root.seed == 999
-        # root.debug: nothing loaded, constructor=True used
-        assert root.debug is True
+        # root.debug: nothing loaded, default=False used
+        assert root.debug is False
+        # model.hidden: loaded=888 beats default=256
+        assert model.hidden == 888
+        # model.lr: nothing loaded, default=0.001 used
+        assert model.lr == 0.001
 
     def test_strict_configclass_rejects_unknown_keys_on_load(self) -> None:
         """A strict configclass raises during _validate for unknown keys."""

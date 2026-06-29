@@ -1,5 +1,5 @@
 """
-Basic usage: define a root config, set values via constructor, save to file.
+Basic usage: define a root config, set values via eafig.set(), save to file.
 
 Run:
     python examples/01_basic.py
@@ -17,8 +17,9 @@ class MyConfig:
     c: float = 1.0
 
 
-# Instantiate with constructor arguments
-config = MyConfig(a=5)
+# Provide values via set(), then instantiate
+eafig.set("a", 5)
+config = MyConfig()
 
 print(f"a = {config.a}")
 print(f"c = {config.c}")

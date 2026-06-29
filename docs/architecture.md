@@ -45,14 +45,14 @@ YAML file / CLI args
 ### Instantiation (stored config → dataclass instance)
 
 ```
-MyConfig(a=5)                    _stored_config
+MyConfig()                       _stored_config
        │                              │
        ▼                              ▼
-  provided = {a: 5}            loaded = _get_config(None)
+  (no args allowed)            loaded = _get_config(None, fill_defaults=False)
        │                              │
        └──────────┬───────────────────┘
                   ▼
-         resolve: loaded > provided > defaults
+         resolve: loaded > defaults
                   │
                   ▼
          original_init(self, **kwargs)
@@ -60,6 +60,8 @@ MyConfig(a=5)                    _stored_config
                   ▼
          _set_config(None, asdict(self))
 ```
+
+Constructor arguments are disabled — use `eafig.set()` or file/CLI loading instead.
 
 ### Extraction (stored config + schema → dict)
 
@@ -117,7 +119,7 @@ Each node carries:
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | — | The key name for this config group |
-| `frozen` | `bool` | `False` | If True, this group's fields cannot be modified via `set()` or constructor overrides |
+| `frozen` | `bool` | `False` | If True, this group's fields cannot be modified via `set()` or loaded values |
 | `hidden` | `bool` | `False` | If True, excluded from output when `include_hidden=False` |
 | `strict` | `bool` | `True` | If True, unknown keys under this group raise `KeyError` |
 | `fields` | `set[str]` | `set()` | Field names declared by the dataclass at this path |

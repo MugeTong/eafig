@@ -33,8 +33,8 @@ class MySubConfig:
 eafig.load("config/default.yaml")
 eafig.from_cli()
 
-# Constructor args overridden by loaded values
-config = MyConfig(a=5)
+# Instantiate — values come from file/CLI or defaults
+config = MyConfig()
 sub = MySubConfig()
 
 # Save to file
@@ -44,7 +44,7 @@ eafig.save("config/saved_config.yaml")
 ## Config Loading Order
 
 ```
-defaults  <  constructor args  <  file (load)  <  CLI (from_cli)
+defaults  <  file (load)  <  CLI (from_cli)
 ```
 
 Each layer overrides the one before it. Among `load()` / `from_cli()` calls, later calls win.
@@ -115,7 +115,7 @@ class MyConfig:
     a: int = 42
 
 config = MyConfig()        # OK — uses defaults
-config = MyConfig(a=5)     # TypeError: cannot override frozen config
+config = MyConfig(seed=999) # TypeError: does not accept constructor arguments
 config.a = 100             # FrozenInstanceError
 ```
 
