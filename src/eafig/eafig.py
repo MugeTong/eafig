@@ -12,7 +12,7 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
-def from_cli(args_list: list[str] | None = None) -> dict:
+def from_cli(args_list: list[str] | None = None) -> dict[str, Any]:
     """Parse command line arguments and return the root configuration as a dictionary.
 
     Args:
@@ -30,7 +30,7 @@ def from_cli(args_list: list[str] | None = None) -> dict:
     return state.get_node_config(None, recursive=False, include_hidden=True)
 
 
-def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict:
+def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict[str, Any]:
     """Load configuration from a file and return the root configuration as a dictionary.
 
     Args:
