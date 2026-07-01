@@ -34,7 +34,7 @@ def rootconfig(
                     f"Use eafig.set() or file/CLI loading to provide values."
                 )
 
-            loaded = state._get_config(None, recursive=False, include_hidden=True)
+            loaded = state.get_node_config(None, recursive=False, include_hidden=True)
             if frozen and loaded:
                 raise TypeError(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
@@ -55,7 +55,7 @@ def rootconfig(
                     )
 
             original_init(self, **init_kwargs)
-            state._set_config(None, asdict(self))
+            state.set_node_config(None, asdict(self))
 
         new_cls.__init__ = new_init
         return new_cls
@@ -100,7 +100,7 @@ def configclass(
                     f"Use eafig.set() or file/CLI loading to provide values."
                 )
 
-            loaded = state._get_config(name, recursive=False, include_hidden=True)
+            loaded = state.get_node_config(name, recursive=False, include_hidden=True)
             if frozen and loaded:
                 raise TypeError(
                     f"Cannot load parameters into frozen configuration '{new_cls.__name__}'"
@@ -121,7 +121,7 @@ def configclass(
                     )
 
             original_init(self, **init_kwargs)
-            state._set_config(name, asdict(self))
+            state.set_node_config(name, asdict(self))
 
         new_cls.__init__ = new_init
         return new_cls

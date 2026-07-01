@@ -34,7 +34,7 @@ class TestRootconfig:
             seed: int = 42
             debug: bool = False
 
-        state._set_config(None, {"seed": 99})
+        state.set_node_config(None, {"seed": 99})
         cfg = Config()
         assert cfg.seed == 99
         assert cfg.debug is False
@@ -90,7 +90,7 @@ class TestRootconfig:
     def test_frozen_rejects_loaded_values(self) -> None:
         """A frozen rootconfig rejects loaded config values."""
         _reset()
-        state._set_config(None, {"seed": 123})
+        state.set_node_config(None, {"seed": 123})
 
         @rootconfig(frozen=True)
         class Config:
@@ -113,7 +113,7 @@ class TestRootconfig:
     def test_loaded_values_override_defaults(self) -> None:
         """Values in stored_config take precedence over field defaults."""
         _reset()
-        state._set_config(None, {"seed": 999})
+        state.set_node_config(None, {"seed": 999})
 
         @rootconfig
         class Config:
@@ -125,7 +125,7 @@ class TestRootconfig:
     def test_loaded_overrides_default(self) -> None:
         """Loaded values override dataclass defaults."""
         _reset()
-        state._set_config(None, {"seed": 999})
+        state.set_node_config(None, {"seed": 999})
 
         @rootconfig
         class Config:
@@ -148,7 +148,7 @@ class TestConfigclass:
             hidden: int = 256
             lr: float = 0.001
 
-        state._set_config("model", {"hidden": 512})
+        state.set_node_config("model", {"hidden": 512})
         cfg = ModelConfig()
         assert cfg.hidden == 512
         assert cfg.lr == 0.001
@@ -217,7 +217,7 @@ class TestConfigclass:
         VisibleConfig()
         InternalConfig()
 
-        result = state._get_config(None, recursive=True, include_hidden=False)
+        result = state.get_node_config(None, recursive=True, include_hidden=False)
         assert "visible" in result
         assert "internal" not in result
 
@@ -235,7 +235,7 @@ class TestConfigclass:
     def test_frozen_configclass_rejects_loaded_values(self) -> None:
         """A frozen configclass rejects values loaded from file/CLI."""
         _reset()
-        state._set_config("model", {"hidden": 999})
+        state.set_node_config("model", {"hidden": 999})
 
         @configclass(name="model", frozen=True)
         class ModelConfig:
@@ -247,7 +247,7 @@ class TestConfigclass:
     def test_configclass_loaded_overrides_default(self) -> None:
         """Loaded values override configclass field defaults."""
         _reset()
-        state._set_config("model", {"hidden": 999})
+        state.set_node_config("model", {"hidden": 999})
 
         @configclass(name="model")
         class ModelConfig:
@@ -259,8 +259,8 @@ class TestConfigclass:
     def test_full_priority_chain(self) -> None:
         """Priority: loaded > defaults. No constructor args."""
         _reset()
-        state._set_config(None, {"seed": 999})
-        state._set_config("model", {"hidden": 888})
+        state.set_node_config(None, {"seed": 999})
+        state.set_node_config("model", {"hidden": 888})
 
         @rootconfig
         class Root:

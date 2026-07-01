@@ -33,7 +33,7 @@ class TestSet:
         _reset()
         Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
         schema.register_schema(Dummy, path=None)
-        state._set_config(None, {"seed": 42})
+        state.set_node_config(None, {"seed": 42})
 
         eafig.set("seed", 99)
         assert eafig.get("seed") == 99
@@ -46,7 +46,7 @@ class TestSet:
         Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
         schema.register_schema(Model, path="model")
 
-        state._set_config("model", {"hidden": 256})
+        state.set_node_config("model", {"hidden": 256})
         eafig.set("model.hidden", 512)
         assert eafig.get("model.hidden") == 512
 
@@ -69,7 +69,7 @@ class TestSet:
         Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
         schema.register_schema(Model, path="model", frozen=True)
 
-        state._set_config("model", {"hidden": 256})
+        state.set_node_config("model", {"hidden": 256})
         with pytest.raises(ValueError, match="'model' is frozen"):
             eafig.set("model.hidden", 512)
 
@@ -119,7 +119,7 @@ class TestGet:
     def test_get_returns_value(self) -> None:
         """get returns a stored value."""
         _reset()
-        state._set_config(None, {"seed": 42})
+        state.set_node_config(None, {"seed": 42})
         assert eafig.get("seed") == 42
 
     def test_get_returns_default_for_missing_key(self) -> None:
@@ -135,7 +135,7 @@ class TestGet:
     def test_get_nested_key(self) -> None:
         """get works with dot-separated keys."""
         _reset()
-        state._set_config("model", {"hidden": 512})
+        state.set_node_config("model", {"hidden": 512})
         assert eafig.get("model.hidden") == 512
 
 
@@ -208,7 +208,7 @@ class TestSave:
         Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
         schema.register_schema(Dummy, path=None)
 
-        state._set_config(None, {"seed": 42})
+        state.set_node_config(None, {"seed": 42})
 
         with tempfile.NamedTemporaryFile(
             mode="w+", suffix=".yaml", delete=False
@@ -228,7 +228,7 @@ class TestSave:
         Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
         schema.register_schema(Dummy, path=None)
 
-        state._set_config(None, {"seed": 42})
+        state.set_node_config(None, {"seed": 42})
 
         buf = StringIO()
         eafig.save(buf)
@@ -244,7 +244,7 @@ class TestSave:
         HiddenCfg = dataclasses.make_dataclass("_HiddenCfg", [("secret", str)])
         schema.register_schema(HiddenCfg, path="hidden_cfg", hidden=True)
 
-        state._set_config("hidden_cfg", {"secret": "shh"})
+        state.set_node_config("hidden_cfg", {"secret": "shh"})
 
         buf = StringIO()
         eafig.save(buf)
@@ -261,7 +261,7 @@ class TestSave:
         )
         schema.register_schema(Dummy, path=None)
 
-        state._set_config(None, {"c": 3, "a": 1, "b": 2})
+        state.set_node_config(None, {"c": 3, "a": 1, "b": 2})
 
         buf = StringIO()
         eafig.save(buf)

@@ -98,19 +98,21 @@ def parse_file(file_path: str | Path | IO[Any], keep_cli: bool = False) -> None:
         _stored_config = cast(DictConfig, OmegaConf.merge(_stored_config, raw))
 
 
-def _get_config(
+def get_node_config(
     path: str | None = None,
     recursive: bool = False,
     include_hidden: bool = False,
     fill_defaults: bool = False,
-) -> dict:
-    """Get the configuration at the specified path.
+) -> dict[str, Any]:
+    """Get the configuration node at the specified path.
 
     Args:
-        path (str | None): The dot-separated path to the configuration. Default is None (root).
+        path (str | None): The dot-separated path to the configuration node. Default is None (root).
         recursive (bool): If True, retrieves the configuration recursively. Default is False.
         include_hidden (bool): If True, includes hidden configurations. Default is False.
-        fill_defaults (bool): If True, fills missing fields with dataclass defaults. Default is False.
+
+    Returns:
+        A dictionary representing the configuration node.
     """
     # Locate the schema node corresponding to the given path
     schema_node = _schema_root
@@ -120,102 +122,106 @@ def _get_config(
                 raise KeyError(f"Path '{path}' is not registered in schema.")
             schema_node = schema_node.children[key]
 
-        if OmegaConf.is_missing(_stored_config, path):
+    # Locate the config node corresponding to the given path
+    config_node = _stored_config
+    if path is not None:
+        if not OmegaConf.select(config_node, path):
             if fill_defaults:
-                return _extract(
+                return _extract_from_config(
                     OmegaConf.create({}),
                     schema_node,
                     recursive=recursive,
                     include_hidden=include_hidden,
-                    fill_defaults=True,
+                    fill_defaults=fill_defaults
                 )
             return {}
         config_node = OmegaConf.select(_stored_config, path)
-        if config_node is None:
-            if fill_defaults:
-                return _extract(
-                    OmegaConf.create({}),
-                    schema_node,
-                    recursive=recursive,
-                    include_hidden=include_hidden,
-                    fill_defaults=True,
-                )
-            return {}
-    else:
-        config_node = _stored_config
 
-    return _extract(
+    return _extract_from_config(
         config_node,
         schema_node,
         recursive=recursive,
         include_hidden=include_hidden,
-        fill_defaults=fill_defaults,
+        fill_defaults=fill_defaults
     )
 
 
-def _extract(
+def _extract_from_config(
     config_node: DictConfig,
     schema_node: ConfigSchema,
     recursive: bool,
     include_hidden: bool,
-    fill_defaults: bool = False,
-) -> dict:
+    fill_defaults: bool,
+) -> dict[str, Any]:
+    """Extract configuration values from a DictConfig based on the schema.
+
+    Args:
+        config_node (DictConfig): The configuration node to extract values from.
+        schema_node (ConfigSchema): The corresponding schema node.
+        recursive (bool): If True, retrieves the configuration recursively. Default is False.
+        include_hidden (bool): If True, includes hidden configurations. Default is False.
+        fill_defaults (bool): If True, fills in default values for missing fields. Default is False.
+
+    Returns:
+        A dictionary representing the extracted configuration values.
+    """
     result = {}
-    for field in schema_node.fields:
-        if field in config_node:
-            value = config_node[field]
-            result[field] = (
-                OmegaConf.to_container(value, resolve=True)
-                if OmegaConf.is_config(value)
-                else value
-            )
-        elif fill_defaults and field in schema_node.defaults:
-            result[field] = schema_node.defaults[field]
 
-    for key, child_schema in schema_node.children.items():
-        if not include_hidden and child_schema.hidden:
+    # Resolve leaf config values for fields defined in the schema
+    for key in config_node:
+        if key in schema_node.fields:
+            if schema_node.hidden and not include_hidden:
+                continue
+            value = config_node[key]
+            if OmegaConf.is_config(value):
+                value = OmegaConf.to_container(value, resolve=True)
+            result[key] = value
+        elif key not in schema_node.children:
+            # For keys not defined in the schema, include them.
+            value = config_node[key]
+            if OmegaConf.is_config(value):
+                value = OmegaConf.to_container(value, resolve=True)
+            result[key] = value
+
+    if fill_defaults:
+        for field in schema_node.fields:
+            if field not in result and field in schema_node.defaults:
+                result[field] = schema_node.defaults[field]
+
+    if not recursive:
+        return result
+
+    for name, child_schema in schema_node.children.items():
+        if child_schema.hidden and not include_hidden:
             continue
-        if key not in config_node:
-            if fill_defaults and (child_schema.fields or child_schema.children):
-                result[key] = _extract(
-                    OmegaConf.create({}),
-                    child_schema,
-                    recursive=recursive,
-                    include_hidden=include_hidden,
-                    fill_defaults=True,
-                )
-            continue
 
-        value = config_node[key]
-
-        if child_schema.children or (fill_defaults and child_schema.fields):
-            result[key] = _extract(
-                value,
+        if name in config_node:
+            result[name] = _extract_from_config(
+                config_node[name],
                 child_schema,
                 recursive=recursive,
                 include_hidden=include_hidden,
                 fill_defaults=fill_defaults,
             )
-        elif OmegaConf.is_config(value):
-            result[key] = OmegaConf.to_container(value, resolve=True)
-        else:
-            result[key] = value
-
-    # For non-strict nodes, preserve unknown keys from the config
-    if not schema_node.strict:
-        known = schema_node.fields | schema_node.children.keys()
-        for key in config_node:
-            if key not in known:
-                value = config_node[key]
-                if OmegaConf.is_config(value):
-                    result[key] = OmegaConf.to_container(value, resolve=True)
-                else:
-                    result[key] = value
+        elif fill_defaults:
+            result[name] = _extract_from_config(
+                OmegaConf.create({}),
+                child_schema,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                fill_defaults=fill_defaults,
+            )
 
     return result
 
 
-def _set_config(path: str | None, config: dict) -> None:
+def set_node_config(path: str | None, config: dict) -> None:
+    """Set the configuration node at the specified path.
+    .. note::
+        This method is used for internal use and testing purposes.
+
+        It has no strict validation and can set any configuration, even if it is not registered in the schema.
+    """
     global _stored_config
     if path is None:
         _stored_config = cast(
