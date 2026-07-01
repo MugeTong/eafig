@@ -43,14 +43,15 @@ def test_validate_root_nonstrict_allows_unknown_keys() -> None:
     state._validate(cfg, "test source")  # should not raise
 
 
-def test_validate_root_strict_empty_schema_allows_any() -> None:
-    """An empty but strict root has nothing to validate against, allowing any key."""
+def test_validate_root_strict_empty_schema_rejects_unknown_key() -> None:
+    """An empty strict root has no valid keys, so any key is treated as unknown."""
     _reset()
     Dummy = dataclasses.make_dataclass("_Dummy", [])
     schema.register_schema(Dummy, path=None, strict=True)
 
     cfg = OmegaConf.create({"anything": "goes"})
-    state._validate(cfg, "test source")  # should not raise
+    with pytest.raises(KeyError, match="Unknown key 'anything' in test source"):
+        state._validate(cfg, "test source")
 
 
 # ── Child config group strict mode ────────────────────────────────────

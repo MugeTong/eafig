@@ -25,8 +25,8 @@ if _schema_root.strict and (_schema_root.fields or _schema_root.children):
             raise KeyError(f"Unknown key '{key}' in {source}.")
 ```
 
-An empty strict root (no fields, no children) accepts any keys — there is nothing to
-validate against.
+An empty strict root (no fields, no children) still rejects any key, because there are
+no known valid keys to permit.
 
 ## Check 2: Config group type
 

@@ -8,14 +8,21 @@ _stored_config: DictConfig = OmegaConf.create({})
 
 
 def _validate(config: DictConfig, source: str) -> None:
-    """Validate the configuration against the schema."""
+    """Validate the configuration against the schema.
 
-    if _schema_root.strict and (_schema_root.fields or _schema_root.children):
+    Notes:
+        Validation checks for the following:
+        - If the schema is strict, it checks for unknown keys in the configuration.
+        - If the schema node is registered as a config group, it ensures that the corresponding value in the configuration is a DictConfig.
+    """
+    # Validation for unknown keys in schema root.
+    # Because we ensure that the schema root is already one dict, there is no need to check for config type.
+    if _schema_root.strict:
         for key in config:
             if key not in _schema_root.valid_keys:
                 raise KeyError(f"Unknown key '{key}' in {source}.")
 
-    for path, schema_node in schema.iter_schema():
+    for path, schema_node in schema.iter_child_schema():
         if OmegaConf.is_missing(config, path):
             continue
         value = OmegaConf.select(config, path)
@@ -29,7 +36,7 @@ def _validate(config: DictConfig, source: str) -> None:
                 f"but got {type(value).__name__} in {source}."
             )
 
-        # If the schema is strict, check for unknown keys
+        # Validation for unknown keys in schema nodes.
         if schema_node.strict:
             for key in value:
                 if key not in schema_node.valid_keys:
