@@ -63,27 +63,45 @@ def register_schema(
     for f in dataclasses.fields(cls):
         if f.default is not dataclasses.MISSING:
             node.defaults[f.name] = f.default
-        elif f.default_factory is not dataclasses.MISSING:  # type: ignore
-            node.defaults[f.name] = f.default_factory()  # type: ignore
+        elif f.default_factory is not dataclasses.MISSING:
+            node.defaults[f.name] = f.default_factory()
 
 
-def iter_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
-    if path is None:
-        node = _schema_root
-    else:
-        node = _schema_root
+def iter_child_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
+    """Iterate over registered child nodes in the schema, yielding (path, ConfigSchema).
+
+    Args:
+        path (Optional[str]): The path to the parent node. If None, starts from the root.
+
+    Yields:
+        Iterator[tuple[str, ConfigSchema]]: An iterator of (path, ConfigSchema)
+
+    Examples:
+        >>> from dataclasses import dataclass
+        >>> @dataclass
+        ... class MyConfigClass:
+        ...     hidden_size: int = 128
+        >>> register_schema(MyConfigClass, path="model.config")
+        >>> for p, s in iter_child_schema():
+        ...     print(p, s.name, 'fields=', s.fields)
+        model model fields= set()
+        model.config config fields= {'hidden_size'}
+
+        >>> for p, s in iter_child_schema('model'):
+        ...     print(p, s.name, 'fields=', s.fields)
+        model.config config fields= {'hidden_size'}
+    """
+    node = _schema_root
+    if path is not None:
         for key in path.split("."):
             node = node.get_or_create(key)
 
-    yield from _iter_non_leaf(node, path)
+    yield from _iter_child_nodes(node, path)
 
 
-def _iter_non_leaf(
-    node: ConfigSchema, path: str | None = None
-) -> Iterator[tuple[str, ConfigSchema]]:
+def _iter_child_nodes(node: ConfigSchema, path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
+    # Yield child nodes (paths are strings) in pre-order traversal.
     for key, child in node.children.items():
         current_path = f"{path}.{key}" if path else key
-        if child.fields or child.children:
-            yield current_path, child
-        if child.children:
-            yield from _iter_non_leaf(child, current_path)
+        yield current_path, child
+        yield from _iter_child_nodes(child, current_path)
