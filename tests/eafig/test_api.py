@@ -138,6 +138,97 @@ class TestGet:
         state.set_node_config("model", {"hidden": 512})
         assert eafig.get("model.hidden") == 512
 
+    def test_get_returns_dict_value(self) -> None:
+        """get returns a dictionary value correctly."""
+        _reset()
+        config_dict = {"lr": 0.001, "momentum": 0.9}
+        state.set_node_config(None, {"optimizer": config_dict})
+        assert eafig.get("optimizer") == config_dict
+
+    def test_get_returns_list_value(self) -> None:
+        """get returns a list value correctly."""
+        _reset()
+        config_list = [1, 2, 3, 4, 5]
+        state.set_node_config(None, {"seeds": config_list})
+        result = eafig.get("seeds")
+        assert result == config_list
+
+    def test_get_returns_boolean_value(self) -> None:
+        """get returns boolean values correctly."""
+        _reset()
+        state.set_node_config(None, {"debug": True, "verbose": False})
+        assert eafig.get("debug") is True
+        assert eafig.get("verbose") is False
+
+    def test_get_returns_string_value(self) -> None:
+        """get returns string values correctly."""
+        _reset()
+        state.set_node_config(None, {"model_name": "resnet50"})
+        assert eafig.get("model_name") == "resnet50"
+
+    def test_get_returns_float_value(self) -> None:
+        """get returns float values correctly."""
+        _reset()
+        state.set_node_config(None, {"learning_rate": 0.001})
+        assert eafig.get("learning_rate") == 0.001
+
+    def test_get_deep_nested_key(self) -> None:
+        """get works with deeply nested dot-separated keys."""
+        _reset()
+        state.set_node_config(None, {
+            "model": {
+                "encoder": {
+                    "hidden_size": 768,
+                    "num_layers": 12
+                }
+            }
+        })
+        assert eafig.get("model.encoder.hidden_size") == 768
+        assert eafig.get("model.encoder.num_layers") == 12
+
+    def test_get_returns_none_for_missing_intermediate_path(self) -> None:
+        """get returns None when an intermediate path doesn't exist."""
+        _reset()
+        state.set_node_config(None, {"model": {"hidden": 512}})
+        assert eafig.get("model.encoder.hidden") is None
+
+    def test_get_returns_default_for_missing_intermediate_path(self) -> None:
+        """get returns default value when intermediate path doesn't exist."""
+        _reset()
+        state.set_node_config(None, {"model": {"hidden": 512}})
+        assert eafig.get("model.encoder.hidden", default=-1) == -1
+
+    def test_get_with_empty_config(self) -> None:
+        """get returns None when config is empty."""
+        _reset()
+        assert eafig.get("anything") is None
+        assert eafig.get("deeply.nested.key") is None
+
+    def test_get_with_zero_value(self) -> None:
+        """get correctly returns zero values (not confused with None/False)."""
+        _reset()
+        state.set_node_config(None, {"count": 0, "ratio": 0.0})
+        assert eafig.get("count") == 0
+        assert eafig.get("ratio") == 0.0
+
+    def test_get_with_empty_string(self) -> None:
+        """get correctly returns empty string (not confused with None)."""
+        _reset()
+        state.set_node_config(None, {"name": ""})
+        assert eafig.get("name") == ""
+
+    def test_get_with_empty_dict(self) -> None:
+        """get correctly returns empty dictionary."""
+        _reset()
+        state.set_node_config(None, {"config": {}})
+        assert eafig.get("config") == {}
+
+    def test_get_with_empty_list(self) -> None:
+        """get correctly returns empty list."""
+        _reset()
+        state.set_node_config(None, {"items": []})
+        assert eafig.get("items") == []
+
 
 # ── from_cli() ────────────────────────────────────────────────────────
 

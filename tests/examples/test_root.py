@@ -27,7 +27,7 @@ def test_set_root_config():
 
     eafig.set("train", {"epochs": 30})
     eafig.set("debug", True)
-    config_instance = Config()
+    config_instance = Config()  # type: ignore
 
     assert OmegaConf.to_container(state._stored_config, resolve=True) == {
         "train": {"epochs": 30},

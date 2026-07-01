@@ -63,7 +63,7 @@ class TestRootconfig:
             seed: int  # no default
 
         with pytest.raises(TypeError, match="Missing required parameter 'seed'"):
-            Config()
+            Config()  # type: ignore
 
     def test_constructor_args_rejected(self) -> None:
         """Constructor arguments are rejected; use eafig.set() instead."""
