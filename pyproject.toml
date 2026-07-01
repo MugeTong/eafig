@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "eafig"
-version = "1.2.6"
+version = "1.2.7"
 description = "Manage your hyperparameters more easily."
 authors = [{ name = "MugeTong", email = "here5320@gmail.com" }]
 license = {"file" = "LICENSE"}
