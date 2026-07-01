@@ -175,14 +175,9 @@ class TestGet:
     def test_get_deep_nested_key(self) -> None:
         """get works with deeply nested dot-separated keys."""
         _reset()
-        state.set_node_config(None, {
-            "model": {
-                "encoder": {
-                    "hidden_size": 768,
-                    "num_layers": 12
-                }
-            }
-        })
+        state.set_node_config(
+            None, {"model": {"encoder": {"hidden_size": 768, "num_layers": 12}}}
+        )
         assert eafig.get("model.encoder.hidden_size") == 768
         assert eafig.get("model.encoder.num_layers") == 12
 

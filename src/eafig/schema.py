@@ -99,7 +99,10 @@ def iter_child_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSche
     yield from _iter_child_nodes(node, path)
 
 
-def _iter_child_nodes(node: ConfigSchema, path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
+def _iter_child_nodes(
+    node: ConfigSchema,
+    path: str | None = None,
+) -> Iterator[tuple[str, ConfigSchema]]:
     # Yield child nodes (paths are strings) in pre-order traversal.
     for key, child in node.children.items():
         current_path = f"{path}.{key}" if path else key

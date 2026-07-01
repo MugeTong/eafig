@@ -1,12 +1,19 @@
-from importlib.metadata import version as __version
+from importlib import metadata
+from typing import Any
 
-from .eafig import from_cli, load, save, set, get, config
+from .eafig import from_cli, load, save, set, get, _config_proxy
 from .registry import configclass, rootconfig
 
-__version__ = __version("eafig")
+__version__ = metadata.version("eafig")
+
+
+def __getattr__(name: str) -> Any:
+    if name == "config":
+        return _config_proxy.config
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
 
 __all__ = [
-    "config",
     "from_cli",
     "load",
     "save",

@@ -6,10 +6,16 @@ from omegaconf import OmegaConf
 from . import state, schema
 
 
-def __getattr__(name: str) -> Any:
-    if name == "config":
-        return state.get_node_config(None, recursive=True, include_hidden=True, fill_defaults=True)
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+class ConfigProxy:
+    @property
+    def config(self) -> dict[str, Any]:
+        """Return the current configuration as a dictionary."""
+        return state.get_node_config(
+            None, recursive=True, include_hidden=True, fill_defaults=True
+        )
+
+
+_config_proxy = ConfigProxy()
 
 
 def from_cli(args_list: list[str] | None = None) -> dict[str, Any]:
@@ -27,7 +33,9 @@ def from_cli(args_list: list[str] | None = None) -> dict[str, Any]:
 
     state.parse_cli(args_list)
 
-    return state.get_node_config(None, recursive=False, include_hidden=True)
+    return state.get_node_config(
+        None, recursive=False, include_hidden=True, fill_defaults=False
+    )
 
 
 def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict[str, Any]:
@@ -41,7 +49,9 @@ def load(file_path: str | Path | IO[Any], keep_cli: bool = False) -> dict[str, A
     """
     state.parse_file(file_path, keep_cli)
 
-    return state.get_node_config(None, recursive=False, include_hidden=True)
+    return state.get_node_config(
+        None, recursive=False, include_hidden=True, fill_defaults=False
+    )
 
 
 def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:
@@ -51,7 +61,9 @@ def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:
         file_path: The path to the file where the configuration will be saved.
         sort_keys: If True, keys will be sorted alphabetically. Default is True.
     """
-    config = state.get_node_config(None, recursive=True, include_hidden=False)
+    config = state.get_node_config(
+        None, recursive=True, include_hidden=False, fill_defaults=True
+    )
     if isinstance(file_path, (str, Path)):
         with open(file_path, "w") as f:
             f.write(OmegaConf.to_yaml(config, sort_keys=sort_keys))

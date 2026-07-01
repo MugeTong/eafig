@@ -90,6 +90,7 @@ def testget_node_config_include_hidden_false_hides_children() -> None:
     result = state.get_node_config(None, recursive=True, include_hidden=False)
     print(result)
     import eafig.state
+
     print(eafig.state._stored_config)
     assert "visible" in result
     assert "hidden" not in result
@@ -133,6 +134,7 @@ def testget_node_config_hidden_deep_child_filtered() -> None:
     assert "parent" in result
     assert "child" not in result["parent"]
 
+
 def testget_node_config_shallow_saved() -> None:
     """A hidden grandchild is filtered even when parent is visible and recursive=False."""
     _reset()
@@ -150,6 +152,7 @@ def testget_node_config_shallow_saved() -> None:
     result = state.get_node_config("parent", recursive=False, include_hidden=False)
     # parent should be present, but its hidden child should NOT appear
     assert "child" not in result
+
 
 # ── Recursive extraction ──────────────────────────────────────────────
 
@@ -195,7 +198,7 @@ def testget_node_config_non_recursive_flattens_children() -> None:
     result = state.get_node_config(None, recursive=True)
     assert result == {"seed": 42, "model": {"hidden": 512}}
     result_non_recursive = state.get_node_config(None, recursive=False)
-    assert result_non_recursive == {"seed": 42 }
+    assert result_non_recursive == {"seed": 42}
 
 
 # ── Non-strict nodes preserve unknown keys ────────────────────────────
@@ -315,9 +318,7 @@ def test_fill_defaults_child_not_in_config_still_filled() -> None:
     Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int, 1)])
     schema.register_schema(Dummy, path=None)
 
-    Model = dataclasses.make_dataclass(
-        "_Model", [("hidden", int, 256)]
-    )
+    Model = dataclasses.make_dataclass("_Model", [("hidden", int, 256)])
     schema.register_schema(Model, path="model")
 
     # model never set — should still appear with defaults

@@ -132,7 +132,7 @@ def get_node_config(
                     schema_node,
                     recursive=recursive,
                     include_hidden=include_hidden,
-                    fill_defaults=fill_defaults
+                    fill_defaults=fill_defaults,
                 )
             return {}
         config_node = OmegaConf.select(_stored_config, path)
@@ -142,7 +142,7 @@ def get_node_config(
         schema_node,
         recursive=recursive,
         include_hidden=include_hidden,
-        fill_defaults=fill_defaults
+        fill_defaults=fill_defaults,
     )
 
 
