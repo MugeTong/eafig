@@ -1,29 +1,18 @@
-"""
-Basic usage: define a root config, set values via eafig.set(), save to file.
-
-Run:
-    python examples/01_basic.py
-"""
+"""Basic config class, CLI override, and save."""
 
 import eafig
-from eafig import rootconfig
+from eafig import configclass
 
 
-@rootconfig
-class MyConfig:
-    """Root configuration with two fields."""
-
-    a: int
-    c: float = 1.0
+@configclass("training")
+class TrainingConfig:
+    epochs: int = 10
+    lr: float = 0.001
 
 
-# Provide values via set(), then instantiate
-eafig.set("a", 5)
-config = MyConfig()
+eafig.from_cli()
+training = TrainingConfig()
 
-print(f"a = {config.a}")
-print(f"c = {config.c}")
-
-# Save the resolved config
+print(f"epochs = {training.epochs}")
+print(f"lr = {training.lr}")
 eafig.save("config/01_basic_output.yaml")
-print("Saved to config/01_basic_output.yaml")

@@ -1,133 +1,73 @@
-import dataclasses
+"""Tests for loading configuration files (eafig.load)."""
+
 from io import StringIO
 
 import pytest
 from omegaconf import OmegaConf
 
-from eafig import state, schema
+import eafig
+from eafig import schema, state
 
 
-def _reset() -> None:
-    """Reset global state between tests."""
-    state._stored_config = OmegaConf.create({})
-    root = schema._schema_root
-    root.fields.clear()
-    root.children.clear()
-    root.defaults.clear()
-    root.strict = True
-    root.frozen = False
-    root.hidden = False
+def test_load_reads_yaml() -> None:
+    eafig.load(StringIO("train:\n  epochs: 30\ndebug: true\n"))
+    assert eafig.get("train.epochs") == 30
+    assert eafig.get("debug") is True
 
 
-def _register_dummy_root() -> None:
-    """Register an empty root schema with strict=False to accept any key."""
-    Dummy = dataclasses.make_dataclass("_Dummy", [])
-    schema.register_schema(Dummy, path=None, strict=False)
+def test_load_none_is_noop() -> None:
+    eafig.load(None)
+    assert OmegaConf.to_container(state.stored_conf) == {}
 
 
-def test_parse_file_reads_from_stringio() -> None:
-    _reset()
-    _register_dummy_root()
-
-    file_obj = StringIO("""
-train:
-  epochs: 30
-debug: true
-""")
-    state.parse_file(file_obj)
-
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == {
-        "train": {"epochs": 30},
-        "debug": True,
-    }
+def test_load_keep_cli_true_preserves_cli() -> None:
+    eafig.from_cli(["--train.epochs", "10"])
+    eafig.load(StringIO("train:\n  epochs: 30\n"), keep_cli=True)
+    assert eafig.get("train.epochs") == 10
 
 
-def test_parse_file_keep_cli_preserves_cli_value() -> None:
-    _reset()
-    _register_dummy_root()
-
-    state.parse_cli(["--train.epochs", "10"])
-    file_obj = StringIO("""
-train:
-  epochs: 30
-""")
-    state.parse_file(file_obj, keep_cli=True)
-
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == {
-        "train": {"epochs": 10},
-    }
+def test_load_keep_cli_false_file_overrides_cli() -> None:
+    eafig.from_cli(["--train.epochs", "10"])
+    eafig.load(StringIO("train:\n  epochs: 30\n"), keep_cli=False)
+    assert eafig.get("train.epochs") == 30
 
 
-def test_parse_file_raises_when_registered_path_is_scalar() -> None:
-    _reset()
-    Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
-    schema.register_schema(Model, path="model")
+def test_load_rejects_non_mapping_file() -> None:
+    with pytest.raises(TypeError, match="must be a YAML mapping"):
+        eafig.load(StringIO("- a\n- b\n"))
 
-    file_obj = StringIO("model: asdfa\n")
-    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
-        state.parse_file(file_obj)
+
+def test_load_rejects_scalar_for_registered_group() -> None:
+    schema.register_schema("model", "Model", ())
+    with pytest.raises(TypeError, match="registered as a config group"):
+        eafig.load(StringIO("model: asdfa\n"))
+
+
+def test_load_rejects_scalar_for_implicit_parent() -> None:
+    schema.register_schema("model.optimizer", "Optimizer", ())
+
+    with pytest.raises(TypeError, match="Path 'model'"):
+        eafig.load(StringIO("model: scalar\n"))
 
 
 @pytest.mark.parametrize(
-    ("yaml_text", "expected"),
+    ("yaml_text", "key", "expected"),
     [
-        (
-            """
-train:
-  epochs: 30
-  lr: 0.001
-""",
-            {"train": {"epochs": 30, "lr": 0.001}},
-        ),
-        (
-            """
-model:
-  layers: [2, 4, 8]
-  name: resnet
-""",
-            {"model": {"layers": [2, 4, 8], "name": "resnet"}},
-        ),
+        ("train:\n  epochs: 30\n  lr: 0.001\n", "train.epochs", 30),
+        ("model:\n  layers: [2, 4, 8]\n", "model.layers", [2, 4, 8]),
+        ("options:\n  nested:\n    enabled: true\n", "options.nested.enabled", True),
     ],
 )
-def test_parse_file_parses_multiple_yaml_shapes(yaml_text: str, expected: dict) -> None:
-    _reset()
-    _register_dummy_root()
-
-    state.parse_file(StringIO(yaml_text))
-
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == expected
+def test_load_supports_multiple_yaml_shapes(
+    yaml_text: str, key: str, expected: object
+) -> None:
+    eafig.load(StringIO(yaml_text))
+    assert eafig.get(key) == expected
 
 
-def test_parse_file_without_keep_cli_file_overrides_cli() -> None:
-    _reset()
-    _register_dummy_root()
+def test_load_allows_registered_group_to_be_missing() -> None:
+    schema.register_schema("model.optimizer", "Optimizer", ())
 
-    state.parse_cli(["--train.epochs", "10"])
-    state.parse_file(StringIO("train:\n  epochs: 30\n"), keep_cli=False)
+    eafig.load(StringIO("training:\n  epochs: 12\n"))
 
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == {
-        "train": {"epochs": 30},
-    }
-
-
-def test_parse_file_raises_when_registered_nested_path_parent_is_scalar() -> None:
-    _reset()
-    Optimizer = dataclasses.make_dataclass("_Optimizer", [("lr", float)])
-    schema.register_schema(Optimizer, path="model.optimizer")
-
-    file_obj = StringIO("model: asdfa\n")
-    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
-        state.parse_file(file_obj)
-
-
-def test_parse_file_allows_missing_registered_path() -> None:
-    _reset()
-    Optimizer = dataclasses.make_dataclass("_Optimizer", [("lr", float)])
-    schema.register_schema(Optimizer, path="model.optimizer")
-    Dummy = dataclasses.make_dataclass("_Dummy", [("train", dict)])
-    schema.register_schema(Dummy, path=None)
-
-    state.parse_file(StringIO("train:\n  epochs: 12\n"))
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == {
-        "train": {"epochs": 12},
-    }
+    assert eafig.get("training.epochs") == 12

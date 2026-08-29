@@ -1,359 +1,150 @@
-"""Tests for eafig public API: set, get, from_cli, load, save."""
+"""Tests for the public eafig API: get, from_cli, load, save."""
 
-import dataclasses
-import tempfile
 from io import StringIO
-from pathlib import Path
 
-import pytest
-from omegaconf import OmegaConf
-
-from eafig import state, schema
 import eafig
+import pytest
+from eafig import configclass
 
 
-def _reset() -> None:
-    """Reset global state between tests."""
-    state._stored_config = OmegaConf.create({})
-    root = schema._schema_root
-    root.fields.clear()
-    root.children.clear()
-    root.defaults.clear()
-    root.strict = True
-    root.frozen = False
-    root.hidden = False
-
-
-# ── set() ─────────────────────────────────────────────────────────────
-
-
-class TestSet:
-    def test_set_leaf_field(self) -> None:
-        """Set a simple leaf field on a non-frozen config group."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
-        schema.register_schema(Dummy, path=None)
-        state.set_node_config(None, {"seed": 42})
-
-        eafig.set("seed", 99)
-        assert eafig.get("seed") == 99
-
-    def test_set_nested_leaf_field(self) -> None:
-        """Set a field inside a nested config group."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-        Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
-        schema.register_schema(Model, path="model")
-
-        state.set_node_config("model", {"hidden": 256})
-        eafig.set("model.hidden", 512)
-        assert eafig.get("model.hidden") == 512
-
-    def test_set_raises_for_registered_config_group(self) -> None:
-        """Setting a key that is a registered config group raises ValueError."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-        Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
-        schema.register_schema(Model, path="model")
-
-        with pytest.raises(ValueError, match="it is a registered config group"):
-            eafig.set("model", {"hidden": 512})
-
-    def test_set_raises_on_frozen_parent(self) -> None:
-        """Setting a field under a frozen config group raises ValueError."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-        Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
-        schema.register_schema(Model, path="model", frozen=True)
-
-        state.set_node_config("model", {"hidden": 256})
-        with pytest.raises(ValueError, match="'model' is frozen"):
-            eafig.set("model.hidden", 512)
-
-    def test_set_raises_on_unknown_key_strict_mode(self) -> None:
-        """Setting an unknown key when root is strict raises KeyError."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
-        schema.register_schema(Dummy, path=None, strict=True)
-
-        with pytest.raises(KeyError, match="Unknown key 'unknown'"):
-            eafig.set("unknown", 42)
-
-    def test_set_raises_on_unknown_nested_key_strict_mode(self) -> None:
-        """Setting an unknown nested key when parent is strict raises KeyError."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-        Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
-        schema.register_schema(Model, path="model", strict=True)
-
-        with pytest.raises(KeyError, match="Unknown key 'model.extra'"):
-            eafig.set("model.extra", "bad")
-
-    def test_set_allows_unknown_key_nonstrict_mode(self) -> None:
-        """Setting an unknown key is allowed when nodes are non-strict."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        eafig.set("dynamic.option", "custom")  # should not raise
-        assert eafig.get("dynamic.option") == "custom"
-
-    def test_set_with_dict_field_value(self) -> None:
-        """Setting a field that is a dict type should work correctly."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [("config", dict)])
-        schema.register_schema(Dummy, path=None)
-
-        eafig.set("config", {"key": "value"})
-        assert eafig.get("config") == {"key": "value"}
-
+# ── get ───────────────────────────────────────────────────────────────
 
-# ── get() ─────────────────────────────────────────────────────────────
-
-
-class TestGet:
-    def test_get_returns_value(self) -> None:
-        """get returns a stored value."""
-        _reset()
-        state.set_node_config(None, {"seed": 42})
-        assert eafig.get("seed") == 42
-
-    def test_get_returns_default_for_missing_key(self) -> None:
-        """get returns the provided default when key is missing."""
-        _reset()
-        assert eafig.get("nonexistent", default=99) == 99
-
-    def test_get_returns_none_by_default(self) -> None:
-        """get returns None when key is missing and no default given."""
-        _reset()
-        assert eafig.get("nonexistent") is None
-
-    def test_get_nested_key(self) -> None:
-        """get works with dot-separated keys."""
-        _reset()
-        state.set_node_config("model", {"hidden": 512})
-        assert eafig.get("model.hidden") == 512
-
-    def test_get_returns_dict_value(self) -> None:
-        """get returns a dictionary value correctly."""
-        _reset()
-        config_dict = {"lr": 0.001, "momentum": 0.9}
-        state.set_node_config(None, {"optimizer": config_dict})
-        assert eafig.get("optimizer") == config_dict
-
-    def test_get_returns_list_value(self) -> None:
-        """get returns a list value correctly."""
-        _reset()
-        config_list = [1, 2, 3, 4, 5]
-        state.set_node_config(None, {"seeds": config_list})
-        result = eafig.get("seeds")
-        assert result == config_list
-
-    def test_get_returns_boolean_value(self) -> None:
-        """get returns boolean values correctly."""
-        _reset()
-        state.set_node_config(None, {"debug": True, "verbose": False})
-        assert eafig.get("debug") is True
-        assert eafig.get("verbose") is False
-
-    def test_get_returns_string_value(self) -> None:
-        """get returns string values correctly."""
-        _reset()
-        state.set_node_config(None, {"model_name": "resnet50"})
-        assert eafig.get("model_name") == "resnet50"
-
-    def test_get_returns_float_value(self) -> None:
-        """get returns float values correctly."""
-        _reset()
-        state.set_node_config(None, {"learning_rate": 0.001})
-        assert eafig.get("learning_rate") == 0.001
-
-    def test_get_deep_nested_key(self) -> None:
-        """get works with deeply nested dot-separated keys."""
-        _reset()
-        state.set_node_config(
-            None, {"model": {"encoder": {"hidden_size": 768, "num_layers": 12}}}
-        )
-        assert eafig.get("model.encoder.hidden_size") == 768
-        assert eafig.get("model.encoder.num_layers") == 12
-
-    def test_get_returns_none_for_missing_intermediate_path(self) -> None:
-        """get returns None when an intermediate path doesn't exist."""
-        _reset()
-        state.set_node_config(None, {"model": {"hidden": 512}})
-        assert eafig.get("model.encoder.hidden") is None
-
-    def test_get_returns_default_for_missing_intermediate_path(self) -> None:
-        """get returns default value when intermediate path doesn't exist."""
-        _reset()
-        state.set_node_config(None, {"model": {"hidden": 512}})
-        assert eafig.get("model.encoder.hidden", default=-1) == -1
-
-    def test_get_with_empty_config(self) -> None:
-        """get returns None when config is empty."""
-        _reset()
-        assert eafig.get("anything") is None
-        assert eafig.get("deeply.nested.key") is None
-
-    def test_get_with_zero_value(self) -> None:
-        """get correctly returns zero values (not confused with None/False)."""
-        _reset()
-        state.set_node_config(None, {"count": 0, "ratio": 0.0})
-        assert eafig.get("count") == 0
-        assert eafig.get("ratio") == 0.0
-
-    def test_get_with_empty_string(self) -> None:
-        """get correctly returns empty string (not confused with None)."""
-        _reset()
-        state.set_node_config(None, {"name": ""})
-        assert eafig.get("name") == ""
-
-    def test_get_with_empty_dict(self) -> None:
-        """get correctly returns empty dictionary."""
-        _reset()
-        state.set_node_config(None, {"config": {}})
-        assert eafig.get("config") == {}
-
-    def test_get_with_empty_list(self) -> None:
-        """get correctly returns empty list."""
-        _reset()
-        state.set_node_config(None, {"items": []})
-        assert eafig.get("items") == []
-
-
-# ── from_cli() ────────────────────────────────────────────────────────
-
-
-class TestFromCli:
-    def test_from_cli_parses_flat_args(self) -> None:
-        """from_cli parses dotted args into config, returning root dict."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        result = eafig.from_cli(["--seed", "42", "--debug"])
-        assert result["seed"] == 42
-        assert result["debug"] is True
-
-    def test_from_cli_parses_nested_args(self) -> None:
-        """from_cli correctly nests dotted keys."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        result = eafig.from_cli(["--model.hidden", "512", "--model.lr", "0.001"])
-        assert result["model"] == {"hidden": 512, "lr": 0.001}
-
-
-# ── load() ────────────────────────────────────────────────────────────
-
-
-class TestLoad:
-    def test_load_reads_yaml(self) -> None:
-        """load reads YAML from a file-like object and returns root dict."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        f = StringIO("train:\n  epochs: 30\ndebug: true\n")
-        result = eafig.load(f)
-        assert result == {"train": {"epochs": 30}, "debug": True}
-
-    def test_load_keep_cli_preserves_cli_values(self) -> None:
-        """load with keep_cli=True gives priority to CLI values."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        eafig.from_cli(["--lr", "0.01"])
-        result = eafig.load(StringIO("lr: 0.001\n"), keep_cli=True)
-        assert result["lr"] == 0.01
-
-    def test_load_without_keep_cli_file_overrides(self) -> None:
-        """load without keep_cli lets file override CLI."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        eafig.from_cli(["--lr", "0.01"])
-        result = eafig.load(StringIO("lr: 0.001\n"), keep_cli=False)
-        assert result["lr"] == 0.001
-
-
-# ── save() ────────────────────────────────────────────────────────────
-
-
-class TestSave:
-    def test_save_writes_yaml_to_file(self) -> None:
-        """save writes full config as YAML to a file path."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
-        schema.register_schema(Dummy, path=None)
-
-        state.set_node_config(None, {"seed": 42})
-
-        with tempfile.NamedTemporaryFile(
-            mode="w+", suffix=".yaml", delete=False
-        ) as tmp:
-            tmp_path = Path(tmp.name)
-
-        try:
-            eafig.save(tmp_path)
-            content = tmp_path.read_text()
-            assert "seed: 42" in content or "seed: 42\n" in content
-        finally:
-            tmp_path.unlink()
-
-    def test_save_writes_to_stringio(self) -> None:
-        """save writes YAML to a file-like object."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [("seed", int)])
-        schema.register_schema(Dummy, path=None)
-
-        state.set_node_config(None, {"seed": 42})
-
-        buf = StringIO()
-        eafig.save(buf)
-        output = buf.getvalue()
-        assert "seed: 42" in output
-
-    def test_save_excludes_hidden_by_default(self) -> None:
-        """save uses include_hidden=False, so hidden config groups are excluded."""
-        _reset()
-        Dummy = dataclasses.make_dataclass("_Dummy", [])
-        schema.register_schema(Dummy, path=None, strict=False)
-
-        HiddenCfg = dataclasses.make_dataclass("_HiddenCfg", [("secret", str)])
-        schema.register_schema(HiddenCfg, path="hidden_cfg", hidden=True)
-
-        state.set_node_config("hidden_cfg", {"secret": "shh"})
-
-        buf = StringIO()
-        eafig.save(buf)
-        output = buf.getvalue()
-        # hidden_cfg should not appear in output
-        assert "hidden_cfg" not in output
-        assert "secret" not in output
-
-    def test_save_sort_keys(self) -> None:
-        """save sorts keys alphabetically by default."""
-        _reset()
-        Dummy = dataclasses.make_dataclass(
-            "_Dummy", [("c", int), ("a", int), ("b", int)]
-        )
-        schema.register_schema(Dummy, path=None)
-
-        state.set_node_config(None, {"c": 3, "a": 1, "b": 2})
-
-        buf = StringIO()
-        eafig.save(buf)
-        output = buf.getvalue()
-        # Keys should appear in alphabetical order
-        a_pos = output.index("a:")
-        b_pos = output.index("b:")
-        c_pos = output.index("c:")
-        assert a_pos < b_pos < c_pos
+
+def test_get_returns_value() -> None:
+    eafig.from_cli(["--seed", "42"])
+    assert eafig.get("seed") == 42
+
+
+def test_get_default_for_missing() -> None:
+    assert eafig.get("nope", default=99) == 99
+
+
+def test_get_none_by_default() -> None:
+    assert eafig.get("nope") is None
+
+
+def test_get_nested() -> None:
+    eafig.from_cli(["--model.hidden", "512"])
+    assert eafig.get("model.hidden") == 512
+
+
+def test_get_deep_nested_value() -> None:
+    eafig.from_cli(["--model.encoder.hidden", "768"])
+    assert eafig.get("model.encoder.hidden") == 768
+
+
+def test_get_missing_intermediate_path_uses_default() -> None:
+    eafig.from_cli(["--model.hidden", "512"])
+    assert eafig.get("model.encoder.hidden") is None
+    assert eafig.get("model.encoder.hidden", default=-1) == -1
+
+
+def test_get_preserves_container_values() -> None:
+    eafig.from_cli(
+        [
+            "--mapping",
+            '{"key":"value"}',
+            "--items",
+            "[1,2,3]",
+        ]
+    )
+    assert eafig.get("mapping") == {"key": "value"}
+    assert eafig.get("items") == [1, 2, 3]
+
+
+def test_get_preserves_falsey_values() -> None:
+    eafig.from_cli(
+        ["--zero", "0", "--ratio", "0.0", "--disabled", "false", "--empty", ""]
+    )
+    assert eafig.get("zero") == 0
+    assert eafig.get("ratio") == 0.0
+    assert eafig.get("disabled") is False
+    assert eafig.get("empty") == ""
+
+
+# ── save ──────────────────────────────────────────────────────────────
+
+
+def test_save_to_file(tmp_path) -> None:
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    out = tmp_path / "saved.yaml"
+    eafig.save(out)
+    assert "hidden: 256" in out.read_text()
+
+
+def test_save_to_stringio() -> None:
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    buf = StringIO()
+    eafig.save(buf)
+    assert "hidden: 256" in buf.getvalue()
+
+
+def test_save_excludes_hidden() -> None:
+    @configclass("visible")
+    class Visible:
+        x: int = 1
+
+    @configclass("secret", hidden=True)
+    class Secret:
+        key: str = "shh"
+
+    buf = StringIO()
+    eafig.save(buf)
+    out = buf.getvalue()
+    assert "visible" in out
+    assert "secret" not in out
+    assert "key" not in out
+
+
+def test_save_sorts_keys_by_default() -> None:
+    @configclass("order")
+    class Order:
+        c: int = 3
+        a: int = 1
+        b: int = 2
+
+    output = StringIO()
+    eafig.save(output)
+    saved = output.getvalue()
+    assert saved.index("a:") < saved.index("b:") < saved.index("c:")
+
+
+def test_load_by_cli_preserves_config_flag_in_saved_output(
+    monkeypatch, tmp_path
+) -> None:
+    config_file = tmp_path / "input.yaml"
+    config_file.write_text("model:\n  hidden: 512\n")
+
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    monkeypatch.setattr("sys.argv", ["app", "--config", str(config_file)])
+    eafig.load_by_cli("config")
+
+    output = StringIO()
+    eafig.save(output)
+    saved = output.getvalue()
+    assert f"config: {config_file}" in saved
+    assert "hidden: 512" in saved
+
+
+def test_load_by_cli_can_only_be_called_once(monkeypatch, tmp_path) -> None:
+    config_file = tmp_path / "input.yaml"
+    config_file.write_text("model:\n  hidden: 512\n")
+    monkeypatch.setattr("sys.argv", ["app", "--config", str(config_file)])
+
+    eafig.load_by_cli("config")
+
+    with pytest.raises(ValueError, match="root.*already registered"):
+        eafig.load_by_cli("config")
+
+
+def test_version() -> None:
+    assert isinstance(eafig.__version__, str)

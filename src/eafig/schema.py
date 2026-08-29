@@ -1,110 +1,103 @@
 import dataclasses
 from typing import Any, Iterator
 
+from omegaconf import DictConfig, OmegaConf
+from . import state
+
 
 class ConfigSchema:
     def __init__(
         self,
         name: str,
-        frozen: bool = False,
         hidden: bool = False,
-        strict: bool = True,
+        allow_dynamic_children: bool = False,
     ):
         self.name = name
-        self.frozen = frozen
         self.hidden = hidden
-        self.strict = strict
-        self.fields: set[str] = set()
-        self.defaults: dict[str, Any] = {}
+        self.registered = False
+        self.allow_dynamic_children = allow_dynamic_children
+
+        self.fields: tuple[dataclasses.Field, ...] = ()
         self.children: dict[str, ConfigSchema] = {}
 
-    @property
-    def valid_keys(self) -> set[str]:
-        return self.fields | self.children.keys()
+    def get_or_create(
+        self,
+        name: str,
+        hidden: bool,
+        allow_dynamic_children: bool,
+    ) -> "ConfigSchema":
+        if name not in self.children:
+            self.children[name] = ConfigSchema(name, hidden, allow_dynamic_children)
+        return self.children[name]
 
-    def get_or_create(self, key: str) -> "ConfigSchema":
-        if key not in self.children:
-            self.children[key] = ConfigSchema(name=key)
-        return self.children[key]
 
-
-_schema_root = ConfigSchema(name="root")
+schema_root = ConfigSchema(name="root", hidden=False, allow_dynamic_children=True)
 
 
 def register_schema(
-    cls: type,
     path: str | None = None,
-    frozen: bool = False,
+    schema_name: str = "root",
+    fields: tuple[dataclasses.Field, ...] = (),
     hidden: bool = False,
-    strict: bool = True,
+    allow_dynamic_children: bool = False,
 ) -> None:
-    node = _schema_root
+    node = schema_root
     if path:
-        for key in path.split("."):
-            node = node.get_or_create(key)
+        parts = path.split(".")
+        if any(not part for part in parts):
+            raise ValueError(f"Invalid path '{path}'. Path segments cannot be empty.")
 
-    node.frozen = frozen
-    node.hidden = hidden
-    node.strict = strict
+        for key in parts[:-1]:
+            # Intermediate nodes are always hidden
+            node = node.get_or_create(key, hidden=True, allow_dynamic_children=False)
+        node = node.get_or_create(parts[-1], hidden, allow_dynamic_children)
 
-    fields = {f.name for f in dataclasses.fields(cls)}
+    if node.registered:
+        raise ValueError(f"Schema node '{path or 'root'}' is already registered.")
 
-    # Check for conflicts between fields and children
-    conflict = fields & node.children.keys()
-    if conflict:
-        raise ValueError(
-            f"Field name(s) {conflict} in '{cls.__name__}' conflict with "
-            f"already registered child config groups at path '{path or 'root'}'."
-        )
+    # Validate and fill default values
+    conf = OmegaConf.select(state.stored_conf, path) if path else state.stored_conf
+    if conf is not None:
+        if not isinstance(conf, DictConfig):
+            raise TypeError(
+                f"Class '{schema_name}' is registered as a config group, "
+                f"but got {type(conf).__name__} in stored configuration."
+            )
 
+    defaults: dict[str, Any] = {}
+    for field in fields:
+        if field.default is not dataclasses.MISSING:
+            defaults[field.name] = field.default
+        elif field.default_factory is not dataclasses.MISSING:
+            defaults[field.name] = field.default_factory()
+        else:
+            raise TypeError(
+                f"Field '{field.name}' in config class '{schema_name}' "
+                f"must provide a default value."
+            )
+
+    default_conf = OmegaConf.structured(defaults)
+    # conf takes priority; default_conf only fills in what's missing.
+    merged = OmegaConf.merge(default_conf, conf if conf is not None else {})
+
+    if path:
+        OmegaConf.update(state.stored_conf, path, merged, merge=False)
+    else:
+        # Root-level: mutate stored_conf in place instead of rebinding the name.
+        state.stored_conf.clear()
+        state.stored_conf.merge_with(merged)
+
+    node.registered = True
     node.fields = fields
-
-    # Extract field defaults for fill_defaults support
-    for f in dataclasses.fields(cls):
-        if f.default is not dataclasses.MISSING:
-            node.defaults[f.name] = f.default
-        elif f.default_factory is not dataclasses.MISSING:
-            node.defaults[f.name] = f.default_factory()
+    node.hidden = hidden
+    node.allow_dynamic_children = allow_dynamic_children
 
 
-def iter_child_schema(path: str | None = None) -> Iterator[tuple[str, ConfigSchema]]:
-    """Iterate over registered child nodes in the schema, yielding (path, ConfigSchema).
-
-    Args:
-        path (Optional[str]): The path to the parent node. If None, starts from the root.
-
-    Yields:
-        Iterator[tuple[str, ConfigSchema]]: An iterator of (path, ConfigSchema)
-
-    Examples:
-        >>> from dataclasses import dataclass
-        >>> @dataclass
-        ... class MyConfigClass:
-        ...     hidden_size: int = 128
-        >>> register_schema(MyConfigClass, path="model.config")
-        >>> for p, s in iter_child_schema():
-        ...     print(p, s.name, 'fields=', s.fields)
-        model model fields= set()
-        model.config config fields= {'hidden_size'}
-
-        >>> for p, s in iter_child_schema('model'):
-        ...     print(p, s.name, 'fields=', s.fields)
-        model.config config fields= {'hidden_size'}
-    """
-    node = _schema_root
-    if path is not None:
-        for key in path.split("."):
-            node = node.get_or_create(key)
-
-    yield from _iter_child_nodes(node, path)
-
-
-def _iter_child_nodes(
-    node: ConfigSchema,
+def iter_nodes(
+    node: ConfigSchema = schema_root,
     path: str | None = None,
 ) -> Iterator[tuple[str, ConfigSchema]]:
-    # Yield child nodes (paths are strings) in pre-order traversal.
     for key, child in node.children.items():
         current_path = f"{path}.{key}" if path else key
         yield current_path, child
-        yield from _iter_child_nodes(child, current_path)
+        yield from iter_nodes(child, current_path)

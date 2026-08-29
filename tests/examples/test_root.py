@@ -1,39 +1,39 @@
-from omegaconf import OmegaConf
+"""Tests for root-level behavior and load_by_cli (rootconfig was removed)."""
 
-from eafig import state, schema
-from eafig.registry import rootconfig
+import pytest
+
 import eafig
+from eafig import configclass, schema, state
 
 
-def _reset() -> None:
-    """Reset global state between tests."""
-    state._stored_config = OmegaConf.create({})
-    root = schema._schema_root
-    root.fields.clear()
-    root.children.clear()
-    root.defaults.clear()
-    root.strict = True
-    root.frozen = False
-    root.hidden = False
+def test_root_has_no_fields_by_default() -> None:
+    assert schema.schema_root.fields == ()
 
 
-def test_set_root_config():
-    _reset()
+def test_root_recursive_extraction() -> None:
+    @configclass("model")
+    class Model:
+        hidden: int = 256
 
-    @rootconfig
-    class Config:
-        train: dict
-        debug: bool
+    assert state.get_node_conf(None, recursive=True) == {"model": {"hidden": 256}}
 
-    eafig.set("train", {"epochs": 30})
-    eafig.set("debug", True)
-    config_instance = Config()  # type: ignore
 
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == {
-        "train": {"epochs": 30},
-        "debug": True,
-    }
-    assert state.get_node_config(None, recursive=True, include_hidden=True) == {
-        "train": {"epochs": 30},
-        "debug": True,
-    }
+def test_load_by_cli_loads_file_and_adds_flag(monkeypatch, tmp_path) -> None:
+    cfg = tmp_path / "conf.yaml"
+    cfg.write_text("model:\n  hidden: 512\n")
+    monkeypatch.setattr("sys.argv", ["prog", "--config", str(cfg)])
+
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    eafig.load_by_cli("config")
+    assert eafig.get("model.hidden") == 512
+    # The CLI flag is registered as a temporary root field.
+    assert "config" in {f.name for f in schema.schema_root.fields}
+
+
+def test_load_by_cli_invalid_flag() -> None:
+    for bad in ("--config", "config.path", ""):
+        with pytest.raises(ValueError, match="Invalid flag"):
+            eafig.load_by_cli(bad)

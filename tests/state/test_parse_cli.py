@@ -1,26 +1,12 @@
-import dataclasses
+"""Tests for command-line argument parsing (helper.args2conf and from_cli)."""
+
+from io import StringIO
+
 import pytest
 from omegaconf import OmegaConf
 
-from eafig import state, schema
-
-
-def _reset() -> None:
-    """Reset global state between tests."""
-    state._stored_config = OmegaConf.create({})
-    root = schema._schema_root
-    root.fields.clear()
-    root.children.clear()
-    root.defaults.clear()
-    root.strict = True
-    root.frozen = False
-    root.hidden = False
-
-
-def _register_dummy_root() -> None:
-    """Register an empty root schema with strict=False to accept any key."""
-    Dummy = dataclasses.make_dataclass("_Dummy", [])
-    schema.register_schema(Dummy, path=None, strict=False)
+import eafig
+from eafig import configclass, helper
 
 
 @pytest.mark.parametrize(
@@ -36,6 +22,7 @@ def _register_dummy_root() -> None:
         (["--verbose"], {"verbose": True}),
         (["--learning_rate", "0.001"], {"learning_rate": 0.001}),
         (["--config", "config.yaml"], {"config": "config.yaml"}),
+        (["--empty", ""], {"empty": ""}),
         (
             ["--flag1", "--flag2", '["value2", "value3"]'],
             {"flag1": True, "flag2": ["value2", "value3"]},
@@ -47,29 +34,39 @@ def _register_dummy_root() -> None:
         (["--list", '{"key1":"value1"}'], {"list": {"key1": "value1"}}),
     ],
 )
-def test_parse_cli(args_list, expected):
-    """CLI parsing with a permissive (strict=False) root accepts any key."""
-    _reset()
-    _register_dummy_root()
-    state.parse_cli(args_list)
-    assert OmegaConf.to_container(state._stored_config, resolve=True) == expected
+def test_args2conf(args_list: list[str], expected: dict) -> None:
+    assert OmegaConf.to_container(helper.args2conf(args_list), resolve=True) == expected
 
 
-def test_parse_cli_raises_when_registered_path_is_scalar() -> None:
-    """A registered config group path must resolve to a dict, not a scalar."""
-    _reset()
-    Model = dataclasses.make_dataclass("_Model", [("hidden", int)])
-    schema.register_schema(Model, path="model")
-
-    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
-        state.parse_cli(["--model", "asdfa"])
+def test_args2conf_empty() -> None:
+    assert OmegaConf.to_container(helper.args2conf([])) == {}
 
 
-def test_parse_cli_raises_when_registered_nested_path_parent_is_scalar() -> None:
-    """A nested registered path like model.optimizer requires model to be a dict."""
-    _reset()
-    Optimizer = dataclasses.make_dataclass("_Optimizer", [("lr", float)])
-    schema.register_schema(Optimizer, path="model.optimizer")
+def test_from_cli_stores_values() -> None:
+    eafig.from_cli(["--model.hidden", "512", "--debug"])
+    assert eafig.get("model.hidden") == 512
+    assert eafig.get("debug") is True
 
-    with pytest.raises(TypeError, match="Path 'model' is registered as a config group"):
-        state.parse_cli(["--model", "asdfa"])
+
+def test_from_cli_overrides_loaded_file() -> None:
+    eafig.load(StringIO("model:\n  hidden: 256\n"))
+    eafig.from_cli(["--model.hidden", "512"])
+    assert eafig.get("model.hidden") == 512
+
+
+def test_from_cli_rejects_scalar_for_registered_group() -> None:
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    with pytest.raises(TypeError, match="registered as a config group"):
+        eafig.from_cli(["--model", "scalar"])
+
+
+def test_from_cli_rejects_scalar_for_implicit_parent() -> None:
+    @configclass("model.optimizer")
+    class Optimizer:
+        lr: float = 0.001
+
+    with pytest.raises(TypeError, match="Path 'model'"):
+        eafig.from_cli(["--model", "scalar"])
