@@ -31,12 +31,12 @@ class ModelConfig:
 eafig.load("config/default.yaml")
 eafig.from_cli()
 
+# Save to file
+eafig.save("config/saved_config.yaml")
+
 # Instantiate — values come from file/CLI or defaults
 training = TrainingConfig()
 model = ModelConfig()
-
-# Save to file
-eafig.save("config/saved_config.yaml")
 ```
 
 ## Core ideas
