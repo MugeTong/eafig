@@ -4,6 +4,7 @@ from typing import IO, Any, Callable, TypeVar
 T = TypeVar("T")
 
 __version__: str
+config: dict[str, Any]
 
 def from_cli(args_list: list[str] | None = None) -> None: ...
 def load(

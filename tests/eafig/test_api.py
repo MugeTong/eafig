@@ -7,7 +7,41 @@ import pytest
 from eafig import configclass
 
 
-# ── get ───────────────────────────────────────────────────────────────
+# ── config ───────────────────────────────────────────────────────────
+
+
+def test_config_exposes_complete_configuration() -> None:
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    assert eafig.config == {"model": {"hidden": 256}}
+
+
+def test_config_is_resolved_dynamically() -> None:
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    assert eafig.config == {"model": {"hidden": 256}}
+    eafig.from_cli(["--model.hidden", "512"])
+    assert eafig.config == {"model": {"hidden": 512}}
+
+
+def test_config_excludes_unregistered_dynamic_values() -> None:
+    eafig.from_cli(["--unregistered", "value"])
+    assert eafig.config == {}
+
+
+def test_config_includes_hidden_groups() -> None:
+    @configclass("secret", hidden=True)
+    class Secret:
+        token: str = "shh"
+
+    assert eafig.config == {"secret": {"token": "shh"}}
+
+
+# ── get ─────────────────────────────────────────────────────────────
 
 
 def test_get_returns_value() -> None:

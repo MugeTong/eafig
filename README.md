@@ -180,6 +180,7 @@ value = eafig.get("missing.key", default=0)  # 0
 | `eafig.from_cli(args=None)` | Parse CLI args (default: `sys.argv[1:]`) |
 | `eafig.load_by_cli(flag, keep_cli=False)` | Load a file path taken from a CLI flag |
 | `eafig.save(path, sort_keys=True)` | Save the config to YAML |
+| `eafig.config` | Access the current complete configuration as a dictionary |
 | `eafig.get(key, default=None)` | Get a single value (dot notation) |
 
 ## Examples

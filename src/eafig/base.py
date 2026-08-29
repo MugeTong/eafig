@@ -7,6 +7,11 @@ from omegaconf import DictConfig, OmegaConf
 from . import schema, state, helper
 
 
+def _get_config() -> dict[str, Any]:
+    """Return the current schema-backed configuration."""
+    return state.get_node_conf(None, recursive=True, include_hidden=True)
+
+
 def from_cli(args_list: list[str] | None = None) -> None:
     """
     Parse command line arguments with '--' format, e.g. --model.optimizer.lr=0.01, and store them in the state.
