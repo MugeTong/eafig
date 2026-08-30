@@ -1,7 +1,7 @@
 import dataclasses
 from pathlib import Path
 import sys as _sys
-from typing import IO, Any
+from typing import IO, Any, cast
 from omegaconf import DictConfig, OmegaConf
 
 from . import schema, state, helper
@@ -25,7 +25,26 @@ def from_cli(args_list: list[str] | None = None) -> None:
     cli_conf = helper.args2conf(args_list)
 
     state.validate_structure(cli_conf, "command line arguments")
+    state.record_cli(cli_conf)
     state.merge(cli_conf, overwrite=True)
+
+
+def _read_file_conf(
+    file_path: str | Path | IO[Any] | None,
+) -> DictConfig | None:
+    """Read and validate a configuration file without changing global state."""
+    if file_path is None:
+        return None
+
+    file_conf = OmegaConf.load(file_path)
+    if not isinstance(file_conf, DictConfig):
+        raise TypeError(
+            f"Config file '{file_path}' must be a YAML mapping (dict), "
+            f"but got {type(file_conf).__name__}."
+        )
+
+    state.validate_structure(file_conf, f"configuration file '{file_path}'")
+    return file_conf
 
 
 def load(file_path: str | Path | IO[Any] | None = None, keep_cli: bool = False) -> None:
@@ -41,18 +60,14 @@ def load(file_path: str | Path | IO[Any] | None = None, keep_cli: bool = False) 
             over values from the file. If False, file values take priority on
             conflicts.
     """
-    if file_path is None:
+    file_conf = _read_file_conf(file_path)
+    if file_conf is None:
         return
-
-    file_conf = OmegaConf.load(file_path)
-    if not isinstance(file_conf, DictConfig):
-        raise TypeError(
-            f"Config file '{file_path}' must be a YAML mapping (dict), "
-            f"but got {type(file_conf).__name__}."
-        )
-
-    state.validate_structure(file_conf, f"configuration file '{file_path}'")
-    state.merge(file_conf, overwrite=not keep_cli)
+    # A file must always override schema defaults. Reapply only values known to
+    # originate from the CLI when they should retain the highest precedence.
+    state.merge(file_conf, overwrite=True)
+    if keep_cli:
+        state.merge(state.cli_values, overwrite=True)
 
 
 def load_by_cli(flag: str, keep_cli: bool = False) -> None:
@@ -95,8 +110,19 @@ def load_by_cli(flag: str, keep_cli: bool = False) -> None:
         )
 
     state.validate_structure(cli_conf, "command line arguments")
-    state.merge(cli_conf, overwrite=True)
-    load(cli_conf.get(flag, None), keep_cli=keep_cli)
+    state.record_cli(cli_conf)
+    file_conf = _read_file_conf(cli_conf.get(flag, None))
+
+    # Merge the two input layers before touching global state. Schema defaults may
+    # already be present there, but must remain below both file and CLI values.
+    if file_conf is None:
+        input_conf = state.cli_values
+    elif keep_cli:
+        input_conf = cast(DictConfig, OmegaConf.merge(file_conf, state.cli_values))
+    else:
+        input_conf = cast(DictConfig, OmegaConf.merge(state.cli_values, file_conf))
+
+    state.merge(input_conf, overwrite=True)
 
 
 def save(file_path: str | Path | IO[Any], sort_keys: bool = True) -> None:

@@ -38,11 +38,12 @@ normal merge priority.
 
 ## Global state
 
-The library maintains two process-wide mutable objects:
+The library maintains three process-wide mutable objects:
 
 | Object | Module | Purpose |
 |---|---|---|
 | `stored_conf` | `state.py` | Merged `DictConfig` containing defaults, files, and CLI values |
+| `cli_values` | `state.py` | CLI-only values retained for precedence-aware file loading |
 | `schema_root` | `schema.py` | Root of the `ConfigSchema` tree |
 
 `state.merge()` mutates `stored_conf` in place so references to the object remain

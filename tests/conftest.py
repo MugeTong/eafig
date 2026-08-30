@@ -13,6 +13,7 @@ def _reset_state():
         # Keep the object identity stable, just like state.merge(). This also
         # prevents tests from hiding stale-reference regressions.
         state.stored_conf.clear()
+        state.cli_values.clear()
         schema.schema_root.children.clear()
         schema.schema_root.fields = ()
         schema.schema_root.registered = False

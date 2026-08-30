@@ -192,6 +192,22 @@ def test_load_by_cli_keep_cli_only_controls_precedence(
     assert eafig.get("debug") is True
 
 
+def test_load_by_cli_file_overrides_registered_default_with_keep_cli(
+    monkeypatch, tmp_path
+) -> None:
+    config_file = tmp_path / "input.yaml"
+    config_file.write_text("model:\n  hidden: 512\n")
+
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    monkeypatch.setattr("sys.argv", ["app", "--config", str(config_file)])
+    eafig.load_by_cli("config", keep_cli=True)
+
+    assert Model().hidden == 512
+
+
 def test_load_by_cli_can_only_be_called_once(monkeypatch, tmp_path) -> None:
     config_file = tmp_path / "input.yaml"
     config_file.write_text("model:\n  hidden: 512\n")

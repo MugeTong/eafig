@@ -5,6 +5,7 @@ from omegaconf import DictConfig, OmegaConf
 from . import schema
 
 stored_conf: DictConfig = OmegaConf.create({})
+cli_values: DictConfig = OmegaConf.create({})
 
 
 def validate_structure(conf: DictConfig, source: str) -> None:
@@ -138,3 +139,10 @@ def merge(conf: DictConfig, overwrite: bool = False) -> None:
 
     stored_conf.clear()
     stored_conf.merge_with(merged)
+
+
+def record_cli(conf: DictConfig) -> None:
+    """Record parsed CLI values separately from defaults and file values."""
+    merged = OmegaConf.merge(cli_values, conf)
+    cli_values.clear()
+    cli_values.merge_with(merged)

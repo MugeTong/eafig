@@ -26,6 +26,28 @@ def test_load_keep_cli_true_preserves_cli() -> None:
     assert eafig.get("train.epochs") == 10
 
 
+@pytest.mark.parametrize(
+    ("keep_cli", "expected_epochs"), [(True, 20), (False, 30)]
+)
+def test_load_precedence_with_registered_defaults(
+    keep_cli: bool, expected_epochs: int
+) -> None:
+    @eafig.configclass("train")
+    class Train:
+        epochs: int = 10
+        workers: int = 1
+
+    eafig.from_cli(["--train.epochs", "20", "--debug"])
+    eafig.load(
+        StringIO("train:\n  epochs: 30\n  workers: 4\n"), keep_cli=keep_cli
+    )
+
+    train = Train()
+    assert train.epochs == expected_epochs
+    assert train.workers == 4
+    assert eafig.get("debug") is True
+
+
 def test_load_keep_cli_false_file_overrides_cli() -> None:
     eafig.from_cli(["--train.epochs", "10"])
     eafig.load(StringIO("train:\n  epochs: 30\n"), keep_cli=False)
