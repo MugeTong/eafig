@@ -169,6 +169,29 @@ def test_load_by_cli_preserves_config_flag_in_saved_output(
     assert "hidden: 512" in saved
 
 
+@pytest.mark.parametrize(
+    ("keep_cli", "expected_hidden"), [(False, 512), (True, 1024)]
+)
+def test_load_by_cli_keep_cli_only_controls_precedence(
+    monkeypatch, tmp_path, keep_cli: bool, expected_hidden: int
+) -> None:
+    config_file = tmp_path / "input.yaml"
+    config_file.write_text("model:\n  hidden: 512\n")
+
+    @configclass("model")
+    class Model:
+        hidden: int = 256
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["app", "--config", str(config_file), "--model.hidden", "1024", "--debug"],
+    )
+    eafig.load_by_cli("config", keep_cli=keep_cli)
+
+    assert Model().hidden == expected_hidden
+    assert eafig.get("debug") is True
+
+
 def test_load_by_cli_can_only_be_called_once(monkeypatch, tmp_path) -> None:
     config_file = tmp_path / "input.yaml"
     config_file.write_text("model:\n  hidden: 512\n")

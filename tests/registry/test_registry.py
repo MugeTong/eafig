@@ -99,6 +99,42 @@ def test_default_factory_supported() -> None:
     assert Cfg().items == []
 
 
+def test_mutable_defaults_are_automatically_converted_to_factories() -> None:
+    @configclass("cfg")
+    class Cfg:
+        tasks: list[str] = ["evaluate", "export"]
+        options: dict[str, int] = {"workers": 2}
+
+    cfg = Cfg()
+    assert cfg.tasks == ["evaluate", "export"]
+    assert cfg.options == {"workers": 2}
+
+
+def test_mutable_default_factory_returns_independent_values() -> None:
+    class Cfg:
+        items: list[list[int]] = [[1]]
+
+    # Test the generated dataclass defaults directly; configclass instances read
+    # their values from the shared configuration state by design.
+    configclass("cfg")(Cfg)
+    first = dataclasses.fields(Cfg)[0].default_factory()
+    second = dataclasses.fields(Cfg)[0].default_factory()
+    first[0].append(2)
+
+    assert second == [[1]]
+
+
+def test_mutable_classvar_is_not_converted_to_a_field() -> None:
+    from typing import ClassVar
+
+    @configclass("cfg")
+    class Cfg:
+        shared: ClassVar[list[str]] = []
+        value: int = 1
+
+    assert [field.name for field in dataclasses.fields(Cfg)] == ["value"]
+
+
 def test_hidden_flag() -> None:
     @configclass("secret", hidden=True)
     class Secret:

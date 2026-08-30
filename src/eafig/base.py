@@ -29,11 +29,17 @@ def from_cli(args_list: list[str] | None = None) -> None:
 
 
 def load(file_path: str | Path | IO[Any] | None = None, keep_cli: bool = False) -> None:
-    """Load configuration from a file and store it in the state. Do not load if `file_path` is None.
+    """Load configuration from a file and merge it into the current state.
+
+    No file is loaded when ``file_path`` is ``None``. Previously parsed command-line
+    values remain in the state in either mode; ``keep_cli`` only controls which value
+    wins when the file and the command line define the same key.
 
     Args:
         file_path (str | Path | IO[Any] | None = None): The path to the configuration file. If None, no file will be loaded.
-        keep_cli (bool = False): Whether to keep the command line arguments in the final configuration.
+        keep_cli (bool = False): If True, existing command-line values take priority
+            over values from the file. If False, file values take priority on
+            conflicts.
     """
     if file_path is None:
         return
@@ -50,14 +56,19 @@ def load(file_path: str | Path | IO[Any] | None = None, keep_cli: bool = False) 
 
 
 def load_by_cli(flag: str, keep_cli: bool = False) -> None:
-    """Load configuration from a file specified by a command line argument and store it in the state.
+    """Parse CLI arguments and load the file selected by one of those arguments.
+
+    All command-line arguments are merged into the configuration regardless of
+    ``keep_cli``. The option only controls precedence for keys that are also present
+    in the selected file.
 
     Examples:
         If the command line argument is '--config config.yaml', the configuration will be loaded from 'config.yaml'.
 
     Args:
         flag (str): The command line argument flag that specifies the configuration file path.
-        keep_cli (bool = False): Whether to keep the command line arguments in the final configuration.
+        keep_cli (bool = False): If True, command-line values take priority over
+            values from the file. If False, file values take priority on conflicts.
     """
     if flag == "" or flag.startswith("--") or "." in flag:
         raise ValueError(

@@ -65,8 +65,13 @@ without one raises a `TypeError`:
 @configclass("model")
 class ModelConfig:
     hidden_dim: int = 256   # OK
+    tasks: list[str] = ["train", "evaluate"]  # mutable defaults are supported
     # lr: float            # TypeError: must provide a default value
 ```
+
+`@configclass` automatically gives `list` and `dict` defaults an
+independent `default_factory`. You can still use `dataclasses.field` explicitly
+when a custom factory is needed.
 
 ## Config loading order
 
@@ -93,8 +98,12 @@ Load a config file whose path comes from a command-line flag:
 
 ```python
 # python app.py --config config.yaml
-eafig.load_by_cli("config")
+eafig.load_by_cli("config", keep_cli=False)  # file wins conflicts (default)
+# eafig.load_by_cli("config", keep_cli=True) # CLI wins conflicts
 ```
+
+`load_by_cli()` always reads all CLI arguments. `keep_cli` only decides precedence
+when a key appears both on the command line and in the selected file.
 
 The flag is registered as the single root schema field, remains in the stored
 configuration, and is included by `save()`. Because the root schema may only be
