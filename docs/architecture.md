@@ -59,11 +59,11 @@ Each `ConfigSchema` contains:
 | `fields` | Dataclass fields registered at this node |
 | `children` | Nested schema nodes |
 | `hidden` | Exclude the group from normal recursive output |
-| `allow_dynamic_children` | Tolerate undeclared keys when reading the node |
+| `ignore_unknown_keys` | Ignore undeclared keys when reading the node |
 
 Registering a deep path creates hidden intermediate nodes. Those nodes remain
 `registered=False` and may later be formally registered; formal registration
-replaces their temporary visibility and dynamic-child options.
+replaces their temporary visibility and unknown-key options.
 
 ## Import dependency
 

@@ -10,12 +10,12 @@ class ConfigSchema:
         self,
         name: str,
         hidden: bool = False,
-        allow_dynamic_children: bool = False,
+        ignore_unknown_keys: bool = False,
     ):
         self.name = name
         self.hidden = hidden
         self.registered = False
-        self.allow_dynamic_children = allow_dynamic_children
+        self.ignore_unknown_keys = ignore_unknown_keys
 
         self.fields: tuple[dataclasses.Field, ...] = ()
         self.children: dict[str, ConfigSchema] = {}
@@ -24,14 +24,14 @@ class ConfigSchema:
         self,
         name: str,
         hidden: bool,
-        allow_dynamic_children: bool,
+        ignore_unknown_keys: bool,
     ) -> "ConfigSchema":
         if name not in self.children:
-            self.children[name] = ConfigSchema(name, hidden, allow_dynamic_children)
+            self.children[name] = ConfigSchema(name, hidden, ignore_unknown_keys)
         return self.children[name]
 
 
-schema_root = ConfigSchema(name="root", hidden=False, allow_dynamic_children=True)
+schema_root = ConfigSchema(name="root", hidden=False, ignore_unknown_keys=True)
 
 
 def register_schema(
@@ -39,7 +39,7 @@ def register_schema(
     schema_name: str = "root",
     fields: tuple[dataclasses.Field, ...] = (),
     hidden: bool = False,
-    allow_dynamic_children: bool = False,
+    ignore_unknown_keys: bool = False,
 ) -> None:
     node = schema_root
     if path:
@@ -49,8 +49,8 @@ def register_schema(
 
         for key in parts[:-1]:
             # Intermediate nodes are always hidden
-            node = node.get_or_create(key, hidden=True, allow_dynamic_children=False)
-        node = node.get_or_create(parts[-1], hidden, allow_dynamic_children)
+            node = node.get_or_create(key, hidden=True, ignore_unknown_keys=False)
+        node = node.get_or_create(parts[-1], hidden, ignore_unknown_keys)
 
     if node.registered:
         raise ValueError(f"Schema node '{path or 'root'}' is already registered.")
@@ -90,7 +90,7 @@ def register_schema(
     node.registered = True
     node.fields = fields
     node.hidden = hidden
-    node.allow_dynamic_children = allow_dynamic_children
+    node.ignore_unknown_keys = ignore_unknown_keys
 
 
 def iter_nodes(

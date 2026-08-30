@@ -85,10 +85,8 @@ def _extract_conf(
 ) -> dict[str, Any]:
     results = {}
 
-    # TODO: Find a better way to handle key checking for config_node.
-    # Current method use 'allow_dynamic_children' to determine if extra keys are allowed.
-    # But note that the root schema is always set to allow_dynamic_children=True,
-    # which means that extra keys at the root level will not raise an error.
+    # Root-level keys may belong to groups that have not been registered yet, so the
+    # root schema ignores unknown keys. Registered groups remain strict by default.
     field_names = {field.name for field in schema_node.fields}
     child_names = set(schema_node.children.keys())
     if child_names & field_names:
@@ -98,11 +96,11 @@ def _extract_conf(
 
     conf_keys = {str(key) for key in conf_node.keys()}
     extra_keys = conf_keys - field_names - child_names
-    if extra_keys and not schema_node.allow_dynamic_children:
+    if extra_keys and not schema_node.ignore_unknown_keys:
         raise KeyError(
-            f"Invalid key(s): {extra_keys} found in {path or 'root'}"
-            f"Use 'allow_dynamic_children=True' in the schema registration "
-            f"to allow dynamic child configurations."
+            f"Invalid key(s): {extra_keys} found in {path or 'root'}. "
+            f"Use 'ignore_unknown_keys=True' in the schema registration to ignore "
+            f"undeclared keys."
         )
 
     for field in schema_node.fields:

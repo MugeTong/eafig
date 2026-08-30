@@ -18,5 +18,5 @@ def configclass(
     *,
     frozen: bool = False,
     hidden: bool = False,
-    allow_dynamic_children: bool = False,
+    ignore_unknown_keys: bool = False,
 ) -> Callable[[type[T]], type[T]]: ...

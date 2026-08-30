@@ -43,13 +43,16 @@ def configclass(
     *,
     frozen: bool = False,
     hidden: bool = False,
-    allow_dynamic_children: bool = False,
+    ignore_unknown_keys: bool = False,
 ):
     """Register a dataclass as a configuration class.
 
     Args:
         name: The name of the configuration class in dot-separated format. (e.g. "model", "model.optimizer")
         frozen: If True, the dataclass will be frozen (immutable). Default is False.
+        hidden: If True, omit this group from recursive output and saved files.
+        ignore_unknown_keys: If True, tolerate undeclared keys in this group. Such
+            keys are ignored when creating the config class or saving configuration.
     """
     if name == "":
         raise ValueError("The 'name' parameter cannot be an empty string.")
@@ -65,7 +68,7 @@ def configclass(
 
         # Register the schema to avoid conflicts
         schema.register_schema(
-            name, cls_name, dataclasses.fields(new_cls), hidden, allow_dynamic_children
+            name, cls_name, dataclasses.fields(new_cls), hidden, ignore_unknown_keys
         )
 
         def new_init(self, *args, **kwargs) -> None:

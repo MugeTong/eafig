@@ -17,7 +17,7 @@ def _reset_state():
         schema.schema_root.fields = ()
         schema.schema_root.registered = False
         schema.schema_root.hidden = False
-        schema.schema_root.allow_dynamic_children = True
+        schema.schema_root.ignore_unknown_keys = True
 
     _reset()
     yield

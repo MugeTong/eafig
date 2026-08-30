@@ -143,12 +143,12 @@ def test_hidden_flag() -> None:
     assert schema.schema_root.children["secret"].hidden is True
 
 
-def test_allow_dynamic_children_flag() -> None:
-    @configclass("dyn", allow_dynamic_children=True)
+def test_ignore_unknown_keys_flag() -> None:
+    @configclass("dyn", ignore_unknown_keys=True)
     class Dyn:
         x: int = 1
 
-    assert schema.schema_root.children["dyn"].allow_dynamic_children is True
+    assert schema.schema_root.children["dyn"].ignore_unknown_keys is True
 
 
 def test_frozen_rejects_mutation() -> None:
@@ -234,14 +234,14 @@ def test_parent_registered_after_child_uses_parent_options() -> None:
     class Child:
         x: int = 1
 
-    @configclass("parent", hidden=False, allow_dynamic_children=True)
+    @configclass("parent", hidden=False, ignore_unknown_keys=True)
     class Parent:
         y: int = 2
 
     parent = schema.schema_root.children["parent"]
     assert parent.registered is True
     assert parent.hidden is False
-    assert parent.allow_dynamic_children is True
+    assert parent.ignore_unknown_keys is True
     assert eafig.state.get_node_conf(None, recursive=True) == {
         "parent": {"y": 2, "child": {"x": 1}}
     }

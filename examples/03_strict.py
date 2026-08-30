@@ -1,4 +1,4 @@
-"""Deferred unknown-key validation and dynamic children."""
+"""Deferred unknown-key validation and optional unknown-key tolerance."""
 
 from io import StringIO
 
@@ -11,7 +11,7 @@ class StrictConfig:
     value: int = 1
 
 
-@configclass("dynamic_group", allow_dynamic_children=True)
+@configclass("dynamic_group", ignore_unknown_keys=True)
 class DynamicConfig:
     value: int = 1
 

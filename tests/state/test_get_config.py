@@ -122,13 +122,13 @@ def test_unknown_key_rejected_by_default() -> None:
         state.get_node_conf("model")
 
 
-def test_unknown_key_allowed_when_dynamic() -> None:
-    @configclass("model", allow_dynamic_children=True)
+def test_unknown_key_ignored_when_configured() -> None:
+    @configclass("model", ignore_unknown_keys=True)
     class Model:
         hidden: int = 256
 
     OmegaConf.update(state.stored_conf, "model.extra", "ok")
-    # Dynamic keys are tolerated but not extracted (extraction is schema-driven).
+    # Unknown keys are tolerated but not extracted (extraction is schema-driven).
     assert state.get_node_conf("model") == {"hidden": 256}
 
 

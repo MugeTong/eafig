@@ -37,7 +37,7 @@ model = ModelConfig()       # KeyError for model.typo
 ```
 
 A node may contain only its declared fields and registered child groups unless it
-was registered with `allow_dynamic_children=True`. Dynamic keys are tolerated but
+was registered with `ignore_unknown_keys=True`. Unknown keys are tolerated but
 are not extracted into the dataclass or written by the schema-driven `save()`.
 
 ## Loading before schema registration
@@ -63,7 +63,7 @@ comes from the dataclass default. Registration raises `TypeError` if the stored
 - Empty path segments such as `.model`, `model.`, or `model..optimizer` are invalid.
 - A schema path may be formally registered only once.
 - Implicit parent nodes may later be formally registered; their final `hidden` and
-  `allow_dynamic_children` options come from that formal registration.
+  `ignore_unknown_keys` options come from that formal registration.
 - The root schema may be registered only once. `load_by_cli()` uses that one root
   registration to retain the file-path flag in saved output.
 

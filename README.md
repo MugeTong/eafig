@@ -125,7 +125,7 @@ assert eafig.get("debug") is True
 assert eafig.get("name") == ""
 ```
 
-## Unknown keys (`allow_dynamic_children`)
+## Unknown keys (`ignore_unknown_keys`)
 
 By default a config group rejects keys that are not declared fields or child
 groups. The rejection happens when the config is read — when you instantiate the
@@ -140,10 +140,11 @@ eafig.load("config.yaml")   # config.yaml has model.typo_key → loaded without 
 model = ModelConfig()       # KeyError: Invalid key(s) {'typo_key'}
 ```
 
-Set `allow_dynamic_children=True` to tolerate extra keys (they are ignored):
+Set `ignore_unknown_keys=True` to tolerate undeclared keys. They are ignored rather
+than added to the config class or treated as child configuration groups:
 
 ```python
-@configclass("model", allow_dynamic_children=True)
+@configclass("model", ignore_unknown_keys=True)
 class ModelConfig:
     hidden_dim: int = 256
 ```
@@ -184,7 +185,7 @@ value = eafig.get("missing.key", default=0)  # 0
 
 | API | Description |
 |-----|-------------|
-| `@configclass(name, *, frozen=False, hidden=False, allow_dynamic_children=False)` | Register a dataclass as a config group |
+| `@configclass(name, *, frozen=False, hidden=False, ignore_unknown_keys=False)` | Register a dataclass as a config group |
 | `eafig.load(path=None, keep_cli=False)` | Load a YAML file or file-like object |
 | `eafig.from_cli(args=None)` | Parse CLI args (default: `sys.argv[1:]`) |
 | `eafig.load_by_cli(flag, keep_cli=False)` | Load a file path taken from a CLI flag |
